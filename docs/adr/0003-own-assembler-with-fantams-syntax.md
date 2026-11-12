@@ -13,3 +13,4 @@ FantAMS itself cannot run in the site: it has no licence file, so its WebAssembl
 
 - Compatibility is checked by tests, not assumed: a test assembles the same sources with our assembler and with the `fantams` binary, and compares the bytes. FantAMS stays a local development tool, never shipped.
 - Each instruction is also checked against cell80's disassembler: assemble, disassemble, compare.
+- One known exception: FantAMS fails with "unrecognized EX form" on `ex af,af'` followed by a comment, which our assembler accepts. Its test goes through cell80 instead.
