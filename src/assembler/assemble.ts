@@ -21,6 +21,9 @@ export interface Assembly {
   readonly errors: readonly AssemblyError[];
 }
 
+/** The first address past the 64 KB the Z80 reaches. */
+const MEMORY_END = 0x10000;
+
 /** The value of a name, or why the line cannot use it. */
 type Lookup = (name: string) => number | Problem;
 
@@ -83,7 +86,10 @@ function pass(
       const name = (label[1] ?? "").toUpperCase();
       // FantAMS reads `halt: nop` as two instructions: skip the whole line.
       if (reserved(name, index + 1)) continue;
-      define(name, origin + bytes.length, index + 1);
+      const address = origin + bytes.length;
+      if (address >= MEMORY_END)
+        errors.push({ line: index + 1, kind: "past-end-of-memory" });
+      define(name, address, index + 1);
       line = label[2] ?? "";
     }
     if (line === "") continue;
@@ -114,10 +120,12 @@ function pass(
       known === undefined
         ? sized(line, address, labels, sizeOf)
         : encode(line, address, addressOf, sizeOf);
-    if (Array.isArray(encoded)) {
-      bytes.push(...encoded);
-    } else {
+    if (!Array.isArray(encoded)) {
       errors.push({ line: index + 1, ...encoded });
+    } else if (address + encoded.length > MEMORY_END) {
+      errors.push({ line: index + 1, kind: "past-end-of-memory" });
+    } else {
+      bytes.push(...encoded);
     }
   }
   return { blocks: [{ address: origin, bytes }], errors, labels };

@@ -207,4 +207,25 @@ describe("assemble, mistakes of a beginner", () => {
   ])("rejects a reserved word as a name: %s", (source, label) => {
     expectError(source, { line: 1, kind: "reserved-word", label });
   });
+
+  // FantAMS would go on silently from address 0.
+  it.each([" org #FFFF\n ld a,1\n", " org #FFFE\n defs 4\n"])(
+    "rejects bytes past the end of memory: %s",
+    (source) => {
+      expectError(source, { line: 2, kind: "past-end-of-memory" });
+    },
+  );
+
+  it("rejects a label past the end of memory", () => {
+    expect(assemble(" org #FFFF\n nop\nafter:\n").errors).toEqual([
+      { line: 3, kind: "past-end-of-memory" },
+    ]);
+  });
+
+  it("keeps the last byte of memory", () => {
+    expect(assemble(" org #FFFF\n nop\n")).toEqual({
+      blocks: [{ address: 0xffff, bytes: [0] }],
+      errors: [],
+    });
+  });
 });

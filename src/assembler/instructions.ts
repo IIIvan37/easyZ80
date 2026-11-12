@@ -7,6 +7,7 @@ export type Problem =
   | { readonly kind: "unknown-label"; readonly label: string }
   | { readonly kind: "size-defined-later"; readonly label: string }
   | { readonly kind: "reserved-word"; readonly label: string }
+  | { readonly kind: "past-end-of-memory" }
   | { readonly kind: "unsupported-character"; readonly character: string }
   | {
       readonly kind: "label-defined-twice";
