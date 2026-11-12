@@ -4,6 +4,12 @@ export type Problem =
   | { readonly kind: "unknown-mnemonic"; readonly mnemonic: string }
   | { readonly kind: "ix-and-iy-together" }
   | { readonly kind: "misplaced-org" }
+  | { readonly kind: "unknown-label"; readonly label: string }
+  | {
+      readonly kind: "label-defined-twice";
+      readonly label: string;
+      readonly firstLine: number;
+    }
   | {
       readonly kind: "number-too-big";
       readonly value: number;
@@ -83,6 +89,9 @@ const REGISTER_NAMES = new Set([
   "P",
   "M",
 ]);
+
+/** A register or a condition: a name that is never a label. */
+export const isRegister = (text: string) => REGISTER_NAMES.has(text);
 
 /** A number written in decimal, or in hexadecimal after `#`. */
 export function number(text: string): number | undefined {

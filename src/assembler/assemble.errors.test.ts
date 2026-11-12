@@ -114,4 +114,21 @@ describe("assemble, mistakes of a beginner", () => {
       { line: 2, kind: "misplaced-org" },
     ]);
   });
+
+  it("rejects a label defined nowhere", () => {
+    expectError(" jp nowhere\n", {
+      line: 1,
+      kind: "unknown-label",
+      label: "NOWHERE",
+    });
+  });
+
+  it("rejects a label defined twice", () => {
+    expectError("loop:\n\nloop:\n", {
+      line: 3,
+      kind: "label-defined-twice",
+      label: "LOOP",
+      firstLine: 1,
+    });
+  });
 });

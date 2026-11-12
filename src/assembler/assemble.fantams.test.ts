@@ -56,4 +56,24 @@ describe("assemble, compared with FantAMS", () => {
   it("jumps back as far as a relative jump reaches, after org", async () => {
     await expectSameBytesAsFantams(" org #8000\n jr #7F82\n");
   });
+
+  it("jumps back to a label", async () => {
+    await expectSameBytesAsFantams(" org #8000\nstart:\n ld a,1\n jp start\n");
+  });
+
+  it("jumps to a label whose address has hexadecimal letters", async () => {
+    await expectSameBytesAsFantams(" org #C0DE\nloop: halt\n jp loop\n");
+  });
+
+  it("jumps forward to a label defined further down", async () => {
+    await expectSameBytesAsFantams(
+      " org #8000\n jr nz,skip\n call done\nskip: ld a,1\ndone: halt\n",
+    );
+  });
+
+  it("reads and writes memory at a label", async () => {
+    await expectSameBytesAsFantams(
+      " org #8000\n ld a,(data)\n ld (data),a\n halt\ndata: nop\n",
+    );
+  });
 });
