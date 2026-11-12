@@ -185,4 +185,12 @@ describe("assemble, mistakes of a beginner", () => {
   ])("rejects data that does not fit: %s", (source, error) => {
     expectError(source, error);
   });
+
+  // FantAMS sizes the program in its first pass: a DEFS count must be known by then.
+  it.each([
+    [" defs size\nsize equ 2\n", "SIZE"],
+    [" defs here\nhere:\n", "HERE"],
+  ])("rejects a defs count defined further down: %s", (source, label) => {
+    expectError(source, { line: 1, kind: "size-defined-later", label });
+  });
 });

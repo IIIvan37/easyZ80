@@ -5,6 +5,7 @@ export type Problem =
   | { readonly kind: "ix-and-iy-together" }
   | { readonly kind: "misplaced-org" }
   | { readonly kind: "unknown-label"; readonly label: string }
+  | { readonly kind: "size-defined-later"; readonly label: string }
   | { readonly kind: "unsupported-character"; readonly character: string }
   | {
       readonly kind: "label-defined-twice";

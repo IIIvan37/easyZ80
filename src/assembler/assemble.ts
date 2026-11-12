@@ -20,6 +20,9 @@ export interface Assembly {
   readonly errors: readonly AssemblyError[];
 }
 
+/** The value of a name, or why the line cannot use it. */
+type Lookup = (name: string) => number | Problem;
+
 export function assemble(source: string): Assembly {
   const { labels } = pass(source, undefined);
   const { blocks, errors } = pass(source, labels);
@@ -55,6 +58,17 @@ function pass(
       });
     }
   };
+  const unknown = (label: string): Problem => ({
+    kind: "unknown-label",
+    label,
+  });
+  const addressOf: Lookup = (name) => labels.get(name) ?? unknown(name);
+  // FantAMS sizes DEFS in its first pass: only names defined above are known.
+  const sizeOf: Lookup = (name) => {
+    if (definedAt.has(name)) return labels.get(name) ?? unknown(name);
+    if (labels.has(name)) return { kind: "size-defined-later", label: name };
+    return unknown(name);
+  };
   for (const [index, rawLine] of source.split("\n").entries()) {
     let line = withoutComment(rawLine).trim();
     const label = /^([A-Z_]\w*):\s*(.*)$/i.exec(line);
@@ -87,8 +101,8 @@ function pass(
     const address = origin + bytes.length;
     const encoded =
       known === undefined
-        ? sized(line, address, labels)
-        : encode(line, address, (name) => labels.get(name));
+        ? sized(line, address, labels, sizeOf)
+        : encode(line, address, addressOf, sizeOf);
     if (Array.isArray(encoded)) {
       bytes.push(...encoded);
     } else {
@@ -113,25 +127,36 @@ function sized(
   line: string,
   address: number,
   labels: ReadonlyMap<string, number>,
+  sizeOf: Lookup,
 ): number[] | Problem {
-  const here = encode(line, address, (name) => labels.get(name) ?? address);
+  const here = encode(
+    line,
+    address,
+    (name) => labels.get(name) ?? address,
+    sizeOf,
+  );
   if (Array.isArray(here)) return here;
-  return encode(line, address, (name) => labels.get(name) ?? 0);
+  return encode(line, address, (name) => labels.get(name) ?? 0, sizeOf);
 }
 
-/** The bytes of one instruction at `address`, or why there are none. */
+/**
+ * The bytes of one instruction at `address`, or why there are none. The
+ * operands of DEFS read names with `sizeOf`, the others with `addressOf`.
+ */
 function encode(
   line: string,
   address: number,
-  addressOf: (label: string) => number | undefined,
+  addressOf: Lookup,
+  sizeOf: Lookup,
 ): number[] | Problem {
   const [word = "", rest = ""] = line.split(/\s+(.*)/);
   const mnemonic = word.toUpperCase();
+  const lookup = mnemonic === "DEFS" ? sizeOf : addressOf;
   const operands =
     rest === ""
       ? []
       : splitOperands(rest).map((text) =>
-          isText(text) ? text : resolve(text.toUpperCase(), addressOf),
+          isText(text) ? text : resolve(text.toUpperCase(), lookup),
         );
   const unknown = operands.find((operand) => typeof operand === "object");
   if (unknown) return unknown;
@@ -142,19 +167,16 @@ function encode(
 }
 
 /**
- * `operand` with a label, alone or in brackets, replaced by its address, or the
- * label nobody defined.
+ * `operand` with a label, alone or in brackets, replaced by its value, or why
+ * the label cannot be used.
  */
-function resolve(
-  operand: string,
-  addressOf: (label: string) => number | undefined,
-): string | Problem {
+function resolve(operand: string, lookup: Lookup): string | Problem {
   const [, open = "", name = "", close = ""] =
     /^(\(?)([A-Z_]\w*)(\)?)$/.exec(operand) ?? [];
   if (name === "" || isRegister(name) || open.length !== close.length)
     return operand;
-  const value = addressOf(name);
-  if (value === undefined) return { kind: "unknown-label", label: name };
+  const value = lookup(name);
+  if (typeof value === "object") return value;
   return `${open}#${value.toString(16).toUpperCase()}${close}`;
 }
 
