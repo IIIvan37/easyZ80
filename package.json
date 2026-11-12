@@ -21,6 +21,7 @@
   "scripts": {
     "dev": "vite demo",
     "build": "rm -rf dist && tsc -p tsconfig.build.json && node scripts/copy-assets.ts",
+    "prepack": "pnpm build",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",

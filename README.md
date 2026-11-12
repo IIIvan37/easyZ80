@@ -37,4 +37,4 @@ easyZ80 runs in the browser, through a bundler that handles CSS imports and `new
 
 ## Release
 
-From `main`: `pnpm build`, then `pnpm pack`, then `gh release create vX.Y.Z` with the tarball. `pnpm pack` packs `dist/` as it is, so build first. Each release updates the version in the installation step.
+From `main`: `pnpm pack`, which builds first, then `gh release create vX.Y.Z` with the tarball. Each release updates the version in the installation step.
