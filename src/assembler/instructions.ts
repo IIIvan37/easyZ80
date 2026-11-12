@@ -71,10 +71,16 @@ const byte: Operand = (text) => {
   return n !== undefined && n <= 0xff ? n : undefined;
 };
 
+/** A number that fits in 16 bits. */
+const word16: Operand = (text) => {
+  const n = number(text);
+  return n !== undefined && n <= 0xffff ? n : undefined;
+};
+
 /** A number in brackets: the address of a memory access. */
 const memory: Operand = (text) =>
   text.startsWith("(") && text.endsWith(")")
-    ? number(text.slice(1, -1).trim())
+    ? word16(text.slice(1, -1).trim())
     : undefined;
 
 /** A port number in brackets, for IN and OUT. */
@@ -246,7 +252,7 @@ const FORMS: readonly Form[] = [
   },
   {
     mnemonic: "LD",
-    operands: [rp, number],
+    operands: [rp, word16],
     encode: ([p = 0, n = 0]) => [0x01 | (p << 4), ...word(n)],
   },
   {
@@ -297,22 +303,22 @@ const FORMS: readonly Form[] = [
   { mnemonic: "JP", operands: [is("(HL)")], encode: () => [0xe9] },
   {
     mnemonic: "JP",
-    operands: [number],
+    operands: [word16],
     encode: ([n = 0]) => [0xc3, ...word(n)],
   },
   {
     mnemonic: "JP",
-    operands: [cc, number],
+    operands: [cc, word16],
     encode: ([c = 0, n = 0]) => [0xc2 | (c << 3), ...word(n)],
   },
   {
     mnemonic: "CALL",
-    operands: [number],
+    operands: [word16],
     encode: ([n = 0]) => [0xcd, ...word(n)],
   },
   {
     mnemonic: "CALL",
-    operands: [cc, number],
+    operands: [cc, word16],
     encode: ([c = 0, n = 0]) => [0xc4 | (c << 3), ...word(n)],
   },
   { mnemonic: "RET", operands: [cc], encode: ([c = 0]) => [0xc0 | (c << 3)] },

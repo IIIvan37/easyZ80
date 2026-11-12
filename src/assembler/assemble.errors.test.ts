@@ -20,4 +20,13 @@ describe("assemble, mistakes of a beginner", () => {
   it("rejects a port number above 255", () => {
     expectErrorAtLine(" out (300),a\n", 1);
   });
+
+  it.each([
+    " ld bc,70000\n",
+    " ld a,(70000)\n",
+    " jp 70000\n",
+    " call z,70000\n",
+  ])("rejects a number above 65535: %s", (source) => {
+    expectErrorAtLine(source, 1);
+  });
 });
