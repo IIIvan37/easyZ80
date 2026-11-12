@@ -1,3 +1,5 @@
+import { encodeInstruction } from "./instructions.ts";
+
 /** Bytes stored from `address` on. */
 export interface Block {
   readonly address: number;
@@ -17,27 +19,24 @@ export interface Assembly {
 
 export function assemble(source: string): Assembly {
   const bytes: number[] = [];
-  for (const rawLine of source.split("\n")) {
-    const line = rawLine.replace(/;.*/, "");
-    const loadA = /^\s*ld\s+a\s*,\s*(\S+)\s*$/i.exec(line);
-    if (loadA?.[1] !== undefined) {
-      bytes.push(0x3e, number(loadA[1]));
-    }
-    const storeA = /^\s*ld\s+\(\s*(\S+)\s*\)\s*,\s*a\s*$/i.exec(line);
-    if (storeA?.[1] !== undefined) {
-      const address = number(storeA[1]);
-      bytes.push(0x32, address & 0xff, address >> 8);
-    }
-    if (/^\s*halt\s*$/i.test(line)) {
-      bytes.push(0x76);
+  const errors: AssemblyError[] = [];
+  for (const [index, rawLine] of source.split("\n").entries()) {
+    const line = rawLine.replace(/;.*/, "").trim();
+    if (line === "") continue;
+    const encoded = encode(line, bytes.length);
+    if (encoded === undefined) {
+      errors.push({ line: index + 1, message: "unknown instruction" });
+    } else {
+      bytes.push(...encoded);
     }
   }
-  return { blocks: [{ address: 0, bytes }], errors: [] };
+  return { blocks: [{ address: 0, bytes }], errors };
 }
 
-/** A number written in decimal, or in hexadecimal after `#`. */
-function number(text: string): number {
-  return text.startsWith("#")
-    ? Number.parseInt(text.slice(1), 16)
-    : Number(text);
+/** The bytes of one instruction at `address`, or undefined when no form fits. */
+function encode(line: string, address: number): number[] | undefined {
+  const [mnemonic = "", rest = ""] = line.toUpperCase().split(/\s+(.*)/);
+  const operands =
+    rest === "" ? [] : rest.split(",").map((operand) => operand.trim());
+  return encodeInstruction(mnemonic, operands, address);
 }

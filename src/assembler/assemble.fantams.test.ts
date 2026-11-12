@@ -37,4 +37,10 @@ describe("assemble, compared with FantAMS", () => {
       ].join("\n"),
     );
   });
+
+  it("reads IX and IY with a displacement, in lower case", async () => {
+    await expectSameBytesAsFantams(
+      " ld a,(ix-16)\n ld (iy+5),#ff\n bit 7,(ix+127)\n jp (ix)\n",
+    );
+  });
 });
