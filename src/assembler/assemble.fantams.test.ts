@@ -76,4 +76,17 @@ describe("assemble, compared with FantAMS", () => {
       " org #8000\n ld a,(data)\n ld (data),a\n halt\ndata: nop\n",
     );
   });
+
+  it("uses a constant named with equ", async () => {
+    await expectSameBytesAsFantams(
+      " org #8000\nscreen equ #4000\nwhite equ 1\n ld a,white\n ld (screen),a\n ld hl,screen\n",
+    );
+  });
+
+  // In the first pass, a name not defined yet must not change the size.
+  it("uses a constant before its equ, labels after it unmoved", async () => {
+    await expectSameBytesAsFantams(
+      " org #8000\n ld a,white\n jp done\ndone: halt\nwhite equ 1\n",
+    );
+  });
 });

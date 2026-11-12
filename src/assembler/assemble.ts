@@ -26,8 +26,8 @@ export function assemble(source: string): Assembly {
 }
 
 /**
- * One reading of the source. Without `known`, it is the first pass: a label not
- * defined yet stands for the current address, which keeps sizes right.
+ * One reading of the source. Without `known`, it is the first pass, which only
+ * finds where each label lands.
  */
 function pass(
   source: string,
@@ -39,26 +39,37 @@ function pass(
   const definedAt = new Map<string, number>();
   const bytes: number[] = [];
   const errors: AssemblyError[] = [];
+  /** Gives `name` its value, unless an earlier line already did. */
+  const define = (name: string, value: number, line: number) => {
+    const firstLine = definedAt.get(name);
+    if (firstLine === undefined) {
+      definedAt.set(name, line);
+      labels.set(name, value);
+    } else {
+      errors.push({
+        line,
+        kind: "label-defined-twice",
+        label: name,
+        firstLine,
+      });
+    }
+  };
   for (const [index, rawLine] of source.split("\n").entries()) {
     let line = rawLine.replace(/;.*/, "").trim();
     const label = /^([A-Z_]\w*):\s*(.*)$/i.exec(line);
     if (label) {
-      const name = (label[1] ?? "").toUpperCase();
-      const firstLine = definedAt.get(name);
-      if (firstLine === undefined) {
-        definedAt.set(name, index + 1);
-        labels.set(name, origin + bytes.length);
-      } else {
-        errors.push({
-          line: index + 1,
-          kind: "label-defined-twice",
-          label: name,
-          firstLine,
-        });
-      }
+      define((label[1] ?? "").toUpperCase(), origin + bytes.length, index + 1);
       line = label[2] ?? "";
     }
     if (line === "") continue;
+    const equ = /^([A-Z_]\w*)\s+equ\s+(.*)$/i.exec(line);
+    if (equ) {
+      const value = directiveValue("EQU", equ[2] ?? "");
+      if (typeof value === "number")
+        define((equ[1] ?? "").toUpperCase(), value, index + 1);
+      else errors.push({ line: index + 1, ...value });
+      continue;
+    }
     const org = /^org\s+(.*)$/i.exec(line);
     if (org && placed) {
       errors.push({ line: index + 1, kind: "misplaced-org" });
@@ -66,25 +77,17 @@ function pass(
     }
     if (org) {
       placed = true;
-      const address = word16((org[1] ?? "").toUpperCase());
-      if (address === undefined) {
-        errors.push({
-          line: index + 1,
-          kind: "wrong-operands",
-          mnemonic: "ORG",
-        });
-      } else if (typeof address === "object") {
-        errors.push({ line: index + 1, ...address });
-      } else {
-        origin = address;
-      }
+      const address = directiveValue("ORG", org[1] ?? "");
+      if (typeof address === "number") origin = address;
+      else errors.push({ line: index + 1, ...address });
       continue;
     }
     placed = true;
     const address = origin + bytes.length;
-    const encoded = encode(line, address, (name) =>
-      known === undefined ? (labels.get(name) ?? address) : labels.get(name),
-    );
+    const encoded =
+      known === undefined
+        ? sized(line, address, labels)
+        : encode(line, address, (name) => labels.get(name));
     if (Array.isArray(encoded)) {
       bytes.push(...encoded);
     } else {
@@ -92,6 +95,27 @@ function pass(
     }
   }
   return { blocks: [{ address: origin, bytes }], errors, labels };
+}
+
+/** The 16-bit number a directive takes, or why it does not fit. */
+function directiveValue(mnemonic: string, text: string): number | Problem {
+  const value = word16(text.toUpperCase());
+  return value ?? { kind: "wrong-operands", mnemonic };
+}
+
+/**
+ * The bytes of one instruction in the first pass, where a name not defined yet
+ * must keep its size: it stands for `address`, which keeps a relative jump in
+ * reach, or else for 0, which fits in 8 bits.
+ */
+function sized(
+  line: string,
+  address: number,
+  labels: ReadonlyMap<string, number>,
+): number[] | Problem {
+  const here = encode(line, address, (name) => labels.get(name) ?? address);
+  if (Array.isArray(here)) return here;
+  return encode(line, address, (name) => labels.get(name) ?? 0);
 }
 
 /** The bytes of one instruction at `address`, or why there are none. */

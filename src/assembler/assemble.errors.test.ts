@@ -131,4 +131,30 @@ describe("assemble, mistakes of a beginner", () => {
       firstLine: 1,
     });
   });
+
+  it("rejects a constant defined twice", () => {
+    expectError("white equ 1\nwhite equ 2\n", {
+      line: 2,
+      kind: "label-defined-twice",
+      label: "WHITE",
+      firstLine: 1,
+    });
+  });
+
+  it("rejects an equ without a number", () => {
+    expectError("white equ a\n", {
+      line: 1,
+      kind: "wrong-operands",
+      mnemonic: "EQU",
+    });
+  });
+
+  it("rejects an equ above 65535", () => {
+    expectError("white equ 70000\n", {
+      line: 1,
+      kind: "number-too-big",
+      value: 70000,
+      bits: 16,
+    });
+  });
 });
