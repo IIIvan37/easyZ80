@@ -89,4 +89,26 @@ describe("assemble, compared with FantAMS", () => {
       " org #8000\n ld a,white\n jp done\ndone: halt\nwhite equ 1\n",
     );
   });
+
+  it("stores bytes with defb", async () => {
+    await expectSameBytesAsFantams(" org #8000\ncolors: defb 1,5,#FF\n");
+  });
+
+  it("stores text with defb, in either quotes", async () => {
+    await expectSameBytesAsFantams(
+      " org #8000\n defb \"Hi, you\",0\n defb 'ok;',13\n",
+    );
+  });
+
+  it("stores 16-bit words with defw, low byte first", async () => {
+    await expectSameBytesAsFantams(
+      " org #8000\ntable: defw table,#1234,next\nnext: nop\n",
+    );
+  });
+
+  it("reserves bytes with defs, filled with 0 or a given byte", async () => {
+    await expectSameBytesAsFantams(
+      " org #8000\nbuffer: defs 3\n defs 2,#AA\n ld hl,buffer\n",
+    );
+  });
 });

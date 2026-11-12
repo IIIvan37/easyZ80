@@ -1,4 +1,5 @@
 import {
+  byte,
   encodeInstruction,
   isRegister,
   type Problem,
@@ -55,7 +56,7 @@ function pass(
     }
   };
   for (const [index, rawLine] of source.split("\n").entries()) {
-    let line = rawLine.replace(/;.*/, "").trim();
+    let line = withoutComment(rawLine).trim();
     const label = /^([A-Z_]\w*):\s*(.*)$/i.exec(line);
     if (label) {
       define((label[1] ?? "").toUpperCase(), origin + bytes.length, index + 1);
@@ -124,13 +125,19 @@ function encode(
   address: number,
   addressOf: (label: string) => number | undefined,
 ): number[] | Problem {
-  const [mnemonic = "", rest = ""] = line.toUpperCase().split(/\s+(.*)/);
+  const [word = "", rest = ""] = line.split(/\s+(.*)/);
+  const mnemonic = word.toUpperCase();
   const operands =
     rest === ""
       ? []
-      : rest.split(",").map((text) => resolve(text.trim(), addressOf));
+      : splitOperands(rest).map((text) =>
+          isText(text) ? text : resolve(text.toUpperCase(), addressOf),
+        );
   const unknown = operands.find((operand) => typeof operand === "object");
   if (unknown) return unknown;
+  if (mnemonic === "DEFB") return defb(operands as string[]);
+  if (mnemonic === "DEFW") return defw(operands as string[]);
+  if (mnemonic === "DEFS") return defs(operands as string[]);
   return encodeInstruction(mnemonic, operands as string[], address);
 }
 
@@ -149,4 +156,90 @@ function resolve(
   const value = addressOf(name);
   if (value === undefined) return { kind: "unknown-label", label: name };
   return `${open}#${value.toString(16).toUpperCase()}${close}`;
+}
+
+/**
+ * Whether each character of `line` stands outside a text in quotes. A quote
+ * opens a text only at the start of an operand: the one of AF' does not.
+ */
+function outsideQuotes(line: string): boolean[] {
+  let quote: string | undefined;
+  return [...line].map((char, i) => {
+    if (quote !== undefined) {
+      if (char === quote) quote = undefined;
+      return false;
+    }
+    if ((char === '"' || char === "'") && /^$|[\s,]/.test(line[i - 1] ?? "")) {
+      quote = char;
+      return false;
+    }
+    return true;
+  });
+}
+
+/** `line` without its comment; a `;` inside quotes is text. */
+function withoutComment(line: string): string {
+  const outside = outsideQuotes(line);
+  const start = [...line].findIndex((char, i) => char === ";" && outside[i]);
+  return start === -1 ? line : line.slice(0, start);
+}
+
+/** The operands of `rest`, trimmed; a comma inside quotes is text. */
+function splitOperands(rest: string): string[] {
+  const outside = outsideQuotes(rest);
+  const operands = [""];
+  [...rest].forEach((char, i) => {
+    if (char === "," && outside[i]) operands.push("");
+    else operands[operands.length - 1] += char;
+  });
+  return operands.map((operand) => operand.trim());
+}
+
+/** A text in quotes, as DEFB takes it. */
+const isText = (operand: string) => /^(["']).*\1$/.test(operand);
+
+/** The bytes of DEFB: one per number, one per character of a text. */
+function defb(operands: readonly string[]): number[] | Problem {
+  const bytes: number[] = [];
+  for (const operand of operands) {
+    if (isText(operand)) {
+      for (const character of operand.slice(1, -1)) {
+        const code = character.codePointAt(0) ?? 0;
+        if (code > 127) return { kind: "unsupported-character", character };
+        bytes.push(code);
+      }
+      continue;
+    }
+    const value = byte(operand);
+    if (value === undefined)
+      return { kind: "wrong-operands", mnemonic: "DEFB" };
+    if (typeof value === "object") return value;
+    bytes.push(value);
+  }
+  return bytes;
+}
+
+/** The bytes of DEFW: two per number, low byte first. */
+function defw(operands: readonly string[]): number[] | Problem {
+  const bytes: number[] = [];
+  for (const operand of operands) {
+    const value = word16(operand);
+    if (value === undefined)
+      return { kind: "wrong-operands", mnemonic: "DEFW" };
+    if (typeof value === "object") return value;
+    bytes.push(value & 0xff, value >> 8);
+  }
+  return bytes;
+}
+
+/** The bytes of DEFS: a count of bytes, filled with 0 or the byte given. */
+function defs(operands: readonly string[]): number[] | Problem {
+  const [countText = "", fillText = "0", ...extra] = operands;
+  const count = word16(countText);
+  const fill = byte(fillText);
+  if (count === undefined || fill === undefined || extra.length > 0)
+    return { kind: "wrong-operands", mnemonic: "DEFS" };
+  if (typeof count === "object") return count;
+  if (typeof fill === "object") return fill;
+  return new Array<number>(count).fill(fill);
 }

@@ -157,4 +157,32 @@ describe("assemble, mistakes of a beginner", () => {
       bits: 16,
     });
   });
+
+  // FantAMS writes such a character in UTF-8, several bytes: ASCII only.
+  it.each([
+    ['"5 €"', "€"],
+    ['"café"', "é"],
+  ])("rejects a character outside ASCII: %s", (text, character) => {
+    expectError(` defb ${text}\n`, {
+      line: 1,
+      kind: "unsupported-character",
+      character,
+    });
+  });
+
+  it.each<[string, AssemblyError]>([
+    [" defb 300\n", { line: 1, kind: "number-too-big", value: 300, bits: 8 }],
+    [
+      " defw 70000\n",
+      { line: 1, kind: "number-too-big", value: 70000, bits: 16 },
+    ],
+    [" defs 2,300\n", { line: 1, kind: "number-too-big", value: 300, bits: 8 }],
+    [" defb a\n", { line: 1, kind: "wrong-operands", mnemonic: "DEFB" }],
+    [" defw 'ab'\n", { line: 1, kind: "wrong-operands", mnemonic: "DEFW" }],
+    [" defs\n", { line: 1, kind: "wrong-operands", mnemonic: "DEFS" }],
+    [" defs 1,2,3\n", { line: 1, kind: "wrong-operands", mnemonic: "DEFS" }],
+    [" defb nowhere\n", { line: 1, kind: "unknown-label", label: "NOWHERE" }],
+  ])("rejects data that does not fit: %s", (source, error) => {
+    expectError(source, error);
+  });
 });

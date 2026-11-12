@@ -5,6 +5,7 @@ export type Problem =
   | { readonly kind: "ix-and-iy-together" }
   | { readonly kind: "misplaced-org" }
   | { readonly kind: "unknown-label"; readonly label: string }
+  | { readonly kind: "unsupported-character"; readonly character: string }
   | {
       readonly kind: "label-defined-twice";
       readonly label: string;
@@ -109,7 +110,7 @@ const fitting =
     if (n === undefined) return undefined;
     return n < 2 ** bits ? n : { kind: "number-too-big", value: n, bits };
   };
-const byte = fitting(8);
+export const byte = fitting(8);
 export const word16 = fitting(16);
 
 /** A number in brackets: the address of a memory access. */
