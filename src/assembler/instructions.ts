@@ -4,7 +4,7 @@ export type Problem =
   | {
       readonly kind: "number-too-big";
       readonly value: number;
-      readonly bits: 8;
+      readonly bits: 8 | 16;
     };
 
 type TooBig = Extract<Problem, { kind: "number-too-big" }>;
@@ -85,18 +85,16 @@ export function number(text: string): number | undefined {
   return undefined;
 }
 
-/** A number that fits in 8 bits. */
-const byte: Operand = (text) => {
-  const n = number(text);
-  if (n === undefined) return undefined;
-  return n <= 0xff ? n : { kind: "number-too-big", value: n, bits: 8 };
-};
-
-/** A number that fits in 16 bits. */
-const word16: Operand = (text) => {
-  const n = number(text);
-  return n !== undefined && n <= 0xffff ? n : undefined;
-};
+/** A number that fits in `bits` bits. */
+const fitting =
+  (bits: 8 | 16): Operand =>
+  (text) => {
+    const n = number(text);
+    if (n === undefined) return undefined;
+    return n < 2 ** bits ? n : { kind: "number-too-big", value: n, bits };
+  };
+const byte = fitting(8);
+const word16 = fitting(16);
 
 /** A number in brackets: the address of a memory access. */
 const memory: Operand = (text) =>

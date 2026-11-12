@@ -39,7 +39,12 @@ describe("assemble, mistakes of a beginner", () => {
     " jp 70000\n",
     " call z,70000\n",
   ])("rejects a number above 65535: %s", (source) => {
-    expectErrorAtLine(source, 1);
+    expectError(source, {
+      line: 1,
+      kind: "number-too-big",
+      value: 70000,
+      bits: 16,
+    });
   });
 
   // JR and DJNZ reach from 128 bytes back to 127 forward, after their 2 bytes.
