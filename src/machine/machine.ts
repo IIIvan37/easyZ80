@@ -1,16 +1,11 @@
 import type { Block } from "../assembler/assemble.ts";
-
-/** The parts of cell80's exports used here (z80-tdd, `wasm/src/lib.rs`). */
-interface Exports {
-  readonly memory: WebAssembly.Memory;
-  memory_ptr(): number;
-  state_ptr(): number;
-  read_state(): void;
-  write_state(): void;
-  step(): void;
-  text_ptr(): number;
-  disassemble(pc: number, bytes: number): number;
-}
+import {
+  type Cell80,
+  decode,
+  type Instruction,
+  MEMORY_SIZE,
+  NO_DEVICES,
+} from "../cpu/cell80.ts";
 
 // The layout of cell80's STATE: the 16-bit registers in this order, then I, R,
 // WZ, IM, IFF1, IFF2, Q and the halted flag.
@@ -30,7 +25,8 @@ const WORD_NAMES = [
 ] as const;
 const HALTED_SLOT = 19;
 const SCREEN_START = 0x4000;
-const SCREEN_BYTES = 32 * 32;
+/** The screen's width and height, in pixels. */
+export const SCREEN_SIZE = 32;
 const RANDOM_PORT = 0xfe;
 const KEY_PORT = 0xff;
 const STATE_LENGTH = 20;
@@ -47,14 +43,8 @@ export interface Flags {
   readonly C: boolean;
 }
 
-/** An instruction decoded by cell80, numbers written `#34` as in FantAMS. */
-export interface Instruction {
-  readonly text: string;
-  readonly length: number;
-}
-
 /** An instruction stored in memory, as the listing shows it. */
-export interface Line {
+export interface ListingLine {
   readonly address: number;
   readonly bytes: readonly number[];
   readonly text: string;
@@ -81,11 +71,14 @@ export interface Machine {
   step(): boolean;
   /** Runs up to `count` instructions; returns how many ran. */
   run(count: number): number;
-  /** The key that the next `IN A,(#FF)` reads, once. */
-  pressKey(code: number): void;
+  /**
+   * Gives the next `IN A,(#FF)` the code of `key`, upper-cased, once. False when
+   * `key` is not one ASCII character, which port #FF cannot hold (ADR 0002).
+   */
+  pressKey(key: string): boolean;
   snapshot(): Snapshot;
   /** The instructions stored from `start` for `byteCount` bytes. */
-  listing(start: number, byteCount: number): Line[];
+  listing(start: number, byteCount: number): ListingLine[];
   /** The 32×32 screen: one byte per pixel from #4000, row after row. */
   readonly screen: Uint8Array;
 }
@@ -114,16 +107,17 @@ export async function createMachine(
         return 0xff;
     }
   };
-  const imports = { env: { io_in, io_out: () => {} } };
-  const cpu = (await WebAssembly.instantiate(module, imports))
-    .exports as unknown as Exports;
+  const cpu = (
+    await WebAssembly.instantiate(module, { env: { io_in, io_out: () => {} } })
+  ).exports as unknown as Cell80;
   // Disassembling may grow its memory: it gets its own instance, so the views below stay valid.
-  const disassembler = (
-    await WebAssembly.instantiate(module, {
-      env: { io_in: () => 0xff, io_out: () => {} },
-    })
-  ).exports as unknown as Exports;
-  const memory = new Uint8Array(cpu.memory.buffer, cpu.memory_ptr(), 0x10000);
+  const disassembler = (await WebAssembly.instantiate(module, NO_DEVICES))
+    .exports as unknown as Cell80;
+  const memory = new Uint8Array(
+    cpu.memory.buffer,
+    cpu.memory_ptr(),
+    MEMORY_SIZE,
+  );
   const state = new Uint16Array(
     cpu.memory.buffer,
     cpu.state_ptr(),
@@ -143,25 +137,15 @@ export async function createMachine(
     return true;
   };
 
-  const disassemble = (address: number): Instruction => {
-    const firstFourBytes = [0, 1, 2, 3].reduce(
-      (word, i) => word + (memory[(address + i) & 0xffff] ?? 0) * 2 ** (8 * i),
-      0,
+  const disassemble = (address: number): Instruction =>
+    decode(
+      disassembler,
+      address,
+      (i) => memory[(address + i) % MEMORY_SIZE] ?? 0,
     );
-    // The instruction's length in the high byte, the text's length in the low byte.
-    const lengths = disassembler.disassemble(address, firstFourBytes);
-    const text = new TextDecoder().decode(
-      new Uint8Array(
-        disassembler.memory.buffer,
-        disassembler.text_ptr(),
-        lengths & 0xff,
-      ),
-    );
-    return { text: text.replaceAll("$", "#"), length: lengths >> 8 };
-  };
 
   return {
-    screen: memory.subarray(SCREEN_START, SCREEN_START + SCREEN_BYTES),
+    screen: memory.subarray(SCREEN_START, SCREEN_START + SCREEN_SIZE ** 2),
 
     load(blocks) {
       memory.fill(0);
@@ -183,8 +167,11 @@ export async function createMachine(
       return ran;
     },
 
-    pressKey(code) {
-      key = code & 0xff;
+    pressKey(typed) {
+      const code = typed.toUpperCase().charCodeAt(0);
+      if (typed.length !== 1 || code > 0x7f) return false;
+      key = code;
+      return true;
     },
 
     snapshot() {
@@ -210,7 +197,7 @@ export async function createMachine(
     },
 
     listing(start, byteCount) {
-      const lines: Line[] = [];
+      const lines: ListingLine[] = [];
       for (let address = start; address < start + byteCount; ) {
         const { text, length } = disassemble(address);
         lines.push({

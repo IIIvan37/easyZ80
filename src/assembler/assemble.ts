@@ -1,3 +1,4 @@
+import { MEMORY_SIZE } from "../cpu/cell80.ts";
 import {
   byte,
   encodeInstruction,
@@ -36,9 +37,6 @@ export interface Assembly {
   readonly blocks: readonly Block[];
   readonly errors: readonly AssemblyError[];
 }
-
-/** The first address past the 64 KB the Z80 reaches. */
-const MEMORY_END = 0x10000;
 
 /** The value of a name, or why the line cannot use it. */
 type Lookup = (name: string) => number | Problem;
@@ -107,7 +105,8 @@ function pass(
       const name = label[1] ?? "";
       // FantAMS reads `halt: nop` as two instructions: skip the whole line.
       if (reserved(name, line)) continue;
-      if (here >= MEMORY_END) errors.push({ line, kind: "past-end-of-memory" });
+      if (here >= MEMORY_SIZE)
+        errors.push({ line, kind: "past-end-of-memory" });
       define(name, here, line);
       text = label[2] ?? "";
     }
@@ -140,7 +139,7 @@ function pass(
         : encode(text, here, addressOr(), sizeOf);
     if (!Array.isArray(encoded)) {
       errors.push({ line, ...encoded });
-    } else if (here + encoded.length > MEMORY_END) {
+    } else if (here + encoded.length > MEMORY_SIZE) {
       errors.push({ line, kind: "past-end-of-memory" });
     } else {
       // Not push(...encoded): a DEFS of 64 KB is too many arguments.
@@ -199,8 +198,8 @@ function encode(
 }
 
 /**
- * `operand`, upper-cased, with a label, alone or in brackets, replaced by its
- * value, or why the label cannot be used, named as written.
+ * `operand`, upper-cased, with a label alone or in brackets replaced by its value.
+ * When the label cannot be used, the problem names it as the line writes it.
  */
 function resolve(operand: string, lookup: Lookup): string | Problem {
   const upper = operand.toUpperCase();

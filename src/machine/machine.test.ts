@@ -59,7 +59,7 @@ describe("machine", () => {
       "in a,(#FF)\nld b,a\nin a,(#FF)\nld c,a\nhalt",
     );
 
-    machine.pressKey(65);
+    machine.pressKey("a");
     machine.run(10);
 
     const { bc } = machine.snapshot().registers;

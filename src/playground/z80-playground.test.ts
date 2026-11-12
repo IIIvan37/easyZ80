@@ -149,9 +149,14 @@ describe("<z80-playground>", () => {
   });
 
   it("runs 200 instructions a frame, even after a quick pause and run", async () => {
-    const frames: FrameRequestCallback[] = [];
-    vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) =>
-      frames.push(callback),
+    const frames = new Map<number, FrameRequestCallback>();
+    let lastRequest = 0;
+    vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
+      frames.set(++lastRequest, callback);
+      return lastRequest;
+    });
+    vi.stubGlobal("cancelAnimationFrame", (request: number) =>
+      frames.delete(request),
     );
     try {
       const playground = await mount("ld hl,0\nloop: inc hl\njr loop");
@@ -159,7 +164,9 @@ describe("<z80-playground>", () => {
       button(playground, "Lancer").click();
       button(playground, "Pause").click();
       button(playground, "Lancer").click();
-      for (const callback of frames.splice(0)) callback(0);
+      const nextFrame = [...frames.values()];
+      frames.clear();
+      for (const callback of nextFrame) callback(0);
 
       // One LD, then 199 instructions that alternate INC and JR.
       expect(register(playground, "HL")).toBe("#0064");
