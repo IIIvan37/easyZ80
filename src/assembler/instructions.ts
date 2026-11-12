@@ -5,9 +5,11 @@ export type Problem =
       readonly kind: "number-too-big";
       readonly value: number;
       readonly bits: 8 | 16;
-    };
+    }
+  | { readonly kind: "jump-too-far"; readonly distance: number };
 
 type TooBig = Extract<Problem, { kind: "number-too-big" }>;
+type TooFar = Extract<Problem, { kind: "jump-too-far" }>;
 
 const UNKNOWN: Problem = { kind: "unknown-instruction" };
 
@@ -23,12 +25,12 @@ interface Form {
   readonly operands: readonly Operand[];
   /**
    * The bytes of the instruction at `address`, given what each operand read,
-   * or undefined when the address puts it out of reach.
+   * or why the address puts it out of reach.
    */
   readonly encode: (
     values: readonly number[],
     address: number,
-  ) => number[] | undefined;
+  ) => number[] | TooFar;
 }
 
 const among =
@@ -113,9 +115,15 @@ const word = (value: number) => [value & 0xff, (value >> 8) & 0xff];
  * JR or DJNZ to `target`: the offset counts from the instruction after their
  * 2 bytes, and reaches from 128 bytes back to 127 forward.
  */
-const relative = (opcode: number, target: number, address: number) => {
-  const offset = target - (address + 2);
-  return offset < -128 || offset > 127 ? undefined : [opcode, offset & 0xff];
+const relative = (
+  opcode: number,
+  target: number,
+  address: number,
+): number[] | TooFar => {
+  const distance = target - (address + 2);
+  return distance < -128 || distance > 127
+    ? { kind: "jump-too-far", distance }
+    : [opcode, distance & 0xff];
 };
 
 const alone = (mnemonic: string, ...bytes: number[]): Form => ({
@@ -375,7 +383,8 @@ const FORMS: readonly Form[] = [
 
 /**
  * The bytes of the first form that `mnemonic` and `operands` fit, at `address`,
- * or the problem of the first form that only an operand out of range stops.
+ * or the problem of the first form that only a number or a jump out of range
+ * stops.
  */
 function encodeForm(
   mnemonic: string,
@@ -389,7 +398,8 @@ function encodeForm(
     const values = form.operands.map((read, i) => read(operands[i] ?? ""));
     if (values.every((value) => typeof value === "number")) {
       const bytes = form.encode(values, address);
-      if (bytes !== undefined) return bytes;
+      if (Array.isArray(bytes)) return bytes;
+      if (problem === UNKNOWN) problem = bytes;
     } else if (problem === UNKNOWN) {
       const tooBig = values.find((value) => typeof value === "object");
       if (tooBig && values.every((value) => value !== undefined))

@@ -51,7 +51,7 @@ describe("assemble, mistakes of a beginner", () => {
   it.each([" jr 200\n", " jr nz,200\n", " djnz 200\n"])(
     "rejects a relative jump too far: %s",
     (source) => {
-      expectErrorAtLine(source, 1);
+      expectError(source, { line: 1, kind: "jump-too-far", distance: 198 });
     },
   );
 });
