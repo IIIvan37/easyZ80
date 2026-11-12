@@ -54,4 +54,16 @@ describe("assemble, mistakes of a beginner", () => {
       expectError(source, { line: 1, kind: "jump-too-far", distance: 198 });
     },
   );
+
+  // (IX+d) and (IY+d) reach from 128 bytes back to 127 forward.
+  it.each([
+    [" ld a,(ix+128)\n", 128],
+    [" ld (iy-129),a\n", -129],
+  ])("rejects a displacement out of range: %s", (source, displacement) => {
+    expectError(source, {
+      line: 1,
+      kind: "displacement-out-of-range",
+      displacement,
+    });
+  });
 });

@@ -6,7 +6,11 @@ export type Problem =
       readonly value: number;
       readonly bits: 8 | 16;
     }
-  | { readonly kind: "jump-too-far"; readonly distance: number };
+  | { readonly kind: "jump-too-far"; readonly distance: number }
+  | {
+      readonly kind: "displacement-out-of-range";
+      readonly displacement: number;
+    };
 
 type TooBig = Extract<Problem, { kind: "number-too-big" }>;
 type TooFar = Extract<Problem, { kind: "jump-too-far" }>;
@@ -456,7 +460,7 @@ export function encodeInstruction(
   const hlToo = operands.some((operand) => ["HL", "H", "L"].includes(operand));
   if (hlToo && displacement === undefined) return UNKNOWN;
   if (displacement !== undefined && (displacement < -128 || displacement > 127))
-    return UNKNOWN;
+    return { kind: "displacement-out-of-range", displacement };
   const bytes = encodeForm(mnemonic, asHl, address);
   if (!Array.isArray(bytes)) return bytes;
   // ED instructions and EX DE,HL have no IX or IY form.
