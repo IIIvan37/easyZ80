@@ -90,7 +90,11 @@ const fetchWasm = async () =>
 
 /** The page's language as the playground speaks it: French or English. */
 const langOf = (element: Element): Lang =>
-  element.closest("[lang]")?.getAttribute("lang")?.startsWith("fr")
+  element
+    .closest("[lang]")
+    ?.getAttribute("lang")
+    ?.toLowerCase()
+    .startsWith("fr")
     ? "fr"
     : "en";
 
@@ -99,7 +103,12 @@ export function definePlayground({
   wasm = fetchWasm,
 }: PlaygroundOptions = {}): void {
   class Z80Playground extends HTMLElement {
+    #enhanced = false;
+
+    // The page may move the element, which connects it again: build it once.
     connectedCallback() {
+      if (this.#enhanced) return;
+      this.#enhanced = true;
       void this.enhance();
     }
 
@@ -187,12 +196,20 @@ export function definePlayground({
         running = value;
         play.textContent = running ? labels.pause : labels.run;
       };
+      // Run, Pause, Run within one frame must not start a second chain of frames.
+      let frameRequested = false;
+      const requestFrame = () => {
+        if (frameRequested) return;
+        frameRequested = true;
+        requestAnimationFrame(frame);
+      };
       const frame = () => {
+        frameRequested = false;
         if (!running) return;
         if (machine.run(INSTRUCTIONS_PER_FRAME) < INSTRUCTIONS_PER_FRAME)
           setRunning(false);
         render();
-        if (running) requestAnimationFrame(frame);
+        if (running) requestFrame();
       };
 
       const step = button(labels.step, () => {
@@ -202,7 +219,7 @@ export function definePlayground({
       });
       const play = button(labels.run, () => {
         setRunning(!running);
-        if (running) requestAnimationFrame(frame);
+        if (running) requestFrame();
       });
 
       let assembly = assemble(original);

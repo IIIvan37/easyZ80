@@ -92,6 +92,12 @@ describe("<z80-playground>", () => {
     expect(button(en, "Step")).toBeTruthy();
   });
 
+  it("reads the page's language whatever its case", async () => {
+    const playground = await mount("halt", "FR-CA");
+
+    expect(button(playground, "Pas à pas")).toBeTruthy();
+  });
+
   it("shows the flags", async () => {
     const playground = await mount("xor a\nhalt");
 
@@ -142,6 +148,26 @@ describe("<z80-playground>", () => {
     expect(button(playground, "Lancer")).toBeTruthy();
   });
 
+  it("runs 200 instructions a frame, even after a quick pause and run", async () => {
+    const frames: FrameRequestCallback[] = [];
+    vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) =>
+      frames.push(callback),
+    );
+    try {
+      const playground = await mount("ld hl,0\nloop: inc hl\njr loop");
+
+      button(playground, "Lancer").click();
+      button(playground, "Pause").click();
+      button(playground, "Lancer").click();
+      for (const callback of frames.splice(0)) callback(0);
+
+      // One LD, then 199 instructions that alternate INC and JR.
+      expect(register(playground, "HL")).toBe("#0064");
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("starts the program again on reset", async () => {
     const playground = await mount("ld a,5\nld b,6\nhalt");
     button(playground, "Pas à pas").click();
@@ -151,6 +177,17 @@ describe("<z80-playground>", () => {
 
     expect(register(playground, "PC")).toBe("#0000");
     expect(register(playground, "AF")).toBe("#FFFF");
+  });
+
+  it("keeps its program when the page moves it", async () => {
+    const playground = await mount("ld a,5\nhalt");
+
+    document.body.append(playground);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    expect(playground.querySelectorAll("button")).toHaveLength(3);
+    button(playground, "Pas à pas").click();
+    expect(register(playground, "AF")).toBe("#05FF");
   });
 
   it("gives a key pressed on the screen to port #FF", async () => {
