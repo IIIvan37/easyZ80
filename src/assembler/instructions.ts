@@ -7,8 +7,14 @@ type Operand = (text: string) => number | undefined;
 interface Form {
   readonly mnemonic: string;
   readonly operands: readonly Operand[];
-  /** The bytes of the instruction at `address`, given what each operand read. */
-  readonly encode: (values: readonly number[], address: number) => number[];
+  /**
+   * The bytes of the instruction at `address`, given what each operand read,
+   * or undefined when the address puts it out of reach.
+   */
+  readonly encode: (
+    values: readonly number[],
+    address: number,
+  ) => number[] | undefined;
 }
 
 const among =
@@ -90,9 +96,14 @@ const port: Operand = (text) =>
     : undefined;
 
 const word = (value: number) => [value & 0xff, (value >> 8) & 0xff];
-/** The offset of a relative jump to `target`, from the instruction after the 2 bytes of JR or DJNZ. */
-const offset = (target: number, address: number) =>
-  (target - (address + 2)) & 0xff;
+/**
+ * JR or DJNZ to `target`: the offset counts from the instruction after their
+ * 2 bytes, and reaches from 128 bytes back to 127 forward.
+ */
+const relative = (opcode: number, target: number, address: number) => {
+  const offset = target - (address + 2);
+  return offset < -128 || offset > 127 ? undefined : [opcode, offset & 0xff];
+};
 
 const alone = (mnemonic: string, ...bytes: number[]): Form => ({
   mnemonic,
@@ -288,17 +299,17 @@ const FORMS: readonly Form[] = [
   {
     mnemonic: "DJNZ",
     operands: [number],
-    encode: ([t = 0], a) => [0x10, offset(t, a)],
+    encode: ([t = 0], a) => relative(0x10, t, a),
   },
   {
     mnemonic: "JR",
     operands: [number],
-    encode: ([t = 0], a) => [0x18, offset(t, a)],
+    encode: ([t = 0], a) => relative(0x18, t, a),
   },
   {
     mnemonic: "JR",
     operands: [jrcc, number],
-    encode: ([c = 0, t = 0], a) => [0x20 | (c << 3), offset(t, a)],
+    encode: ([c = 0, t = 0], a) => relative(0x20 | (c << 3), t, a),
   },
   { mnemonic: "JP", operands: [is("(HL)")], encode: () => [0xe9] },
   {

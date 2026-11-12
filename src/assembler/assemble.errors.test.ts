@@ -29,4 +29,12 @@ describe("assemble, mistakes of a beginner", () => {
   ])("rejects a number above 65535: %s", (source) => {
     expectErrorAtLine(source, 1);
   });
+
+  // JR and DJNZ reach from 128 bytes back to 127 forward, after their 2 bytes.
+  it.each([" jr 200\n", " jr nz,200\n", " djnz 200\n"])(
+    "rejects a relative jump too far: %s",
+    (source) => {
+      expectErrorAtLine(source, 1);
+    },
+  );
 });
