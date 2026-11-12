@@ -3,12 +3,6 @@ import { type AssemblyError, assemble } from "./assemble.ts";
 
 // Seam 3 (ADR 0003): a mistake gives no bytes and an error at its line,
 // reported as a code with data (ADR 0005).
-function expectErrorAtLine(source: string, line: number) {
-  const { blocks, errors } = assemble(source);
-  expect(blocks.flatMap((block) => block.bytes)).toEqual([]);
-  expect(errors.map((error) => error.line)).toEqual([line]);
-}
-
 function expectError(source: string, error: AssemblyError) {
   const { blocks, errors } = assemble(source);
   expect(blocks.flatMap((block) => block.bytes)).toEqual([]);
@@ -17,7 +11,7 @@ function expectError(source: string, error: AssemblyError) {
 
 describe("assemble, mistakes of a beginner", () => {
   it("rejects IX and IY in the same instruction", () => {
-    expectErrorAtLine(" add ix,iy\n", 1);
+    expectError(" add ix,iy\n", { line: 1, kind: "ix-and-iy-together" });
   });
 
   it("rejects a number too big for an 8-bit register", () => {
@@ -30,7 +24,12 @@ describe("assemble, mistakes of a beginner", () => {
   });
 
   it("rejects a port number above 255", () => {
-    expectErrorAtLine(" out (300),a\n", 1);
+    expectError(" out (300),a\n", {
+      line: 1,
+      kind: "number-too-big",
+      value: 300,
+      bits: 8,
+    });
   });
 
   it.each([

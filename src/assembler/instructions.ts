@@ -1,6 +1,7 @@
 /** Why a line gives no bytes, as a code with data (ADR 0005). */
 export type Problem =
   | { readonly kind: "unknown-instruction" }
+  | { readonly kind: "ix-and-iy-together" }
   | {
       readonly kind: "number-too-big";
       readonly value: number;
@@ -432,7 +433,7 @@ export function encodeInstruction(
   const indexes = new Set(
     operands.map((operand) => /\bI[XY]\b/.exec(operand)?.[0]).filter(Boolean),
   );
-  if (indexes.size > 1) return UNKNOWN;
+  if (indexes.size > 1) return { kind: "ix-and-iy-together" };
 
   let prefix: number | undefined;
   let displacement: number | undefined;
