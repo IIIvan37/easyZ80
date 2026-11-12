@@ -28,8 +28,7 @@ describe("assemble, decoded back by cell80", () => {
   ])("%s", expectRoundTrip);
 
   // The quote of AF' opens no text: the comment after it stays a comment.
-  // Not compared with FantAMS: it fails on any comment after AF',
-  // with "unrecognized EX form".
+  // Not compared with FantAMS, which fails on it (ADR 0003).
   it("EX AF,AF' followed by a comment", () => {
     const { blocks, errors } = assemble(" ex af,af' ; swap, then 'quote\n");
     expect(errors).toEqual([]);

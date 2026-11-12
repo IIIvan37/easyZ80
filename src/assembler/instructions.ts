@@ -1,19 +1,8 @@
-/** Why a line gives no bytes, as a code with data (ADR 0005). */
-export type Problem =
+/** Why an instruction gives no bytes, as a code with data (ADR 0005). */
+export type InstructionProblem =
   | { readonly kind: "wrong-operands"; readonly mnemonic: string }
   | { readonly kind: "unknown-mnemonic"; readonly mnemonic: string }
   | { readonly kind: "ix-and-iy-together" }
-  | { readonly kind: "misplaced-org" }
-  | { readonly kind: "unknown-label"; readonly label: string }
-  | { readonly kind: "size-defined-later"; readonly label: string }
-  | { readonly kind: "reserved-word"; readonly label: string }
-  | { readonly kind: "past-end-of-memory" }
-  | { readonly kind: "unsupported-character"; readonly character: string }
-  | {
-      readonly kind: "label-defined-twice";
-      readonly label: string;
-      readonly firstLine: number;
-    }
   | {
       readonly kind: "number-too-big";
       readonly value: number;
@@ -25,8 +14,8 @@ export type Problem =
       readonly displacement: number;
     };
 
-type TooBig = Extract<Problem, { kind: "number-too-big" }>;
-type TooFar = Extract<Problem, { kind: "jump-too-far" }>;
+type TooBig = Extract<InstructionProblem, { kind: "number-too-big" }>;
+type TooFar = Extract<InstructionProblem, { kind: "jump-too-far" }>;
 
 /**
  * Reads one operand as written in the source, upper-cased and trimmed, and
@@ -116,19 +105,34 @@ const fitting =
 export const byte = fitting(8);
 export const word16 = fitting(16);
 
+/** What `inner` reads, written in brackets. */
+const inBrackets =
+  (inner: Operand): Operand =>
+  (text) =>
+    text.startsWith("(") && text.endsWith(")")
+      ? inner(text.slice(1, -1).trim())
+      : undefined;
 /** A number in brackets: the address of a memory access. */
-const memory: Operand = (text) =>
-  text.startsWith("(") && text.endsWith(")")
-    ? word16(text.slice(1, -1).trim())
-    : undefined;
-
+const memory = inBrackets(word16);
 /** A port number in brackets, for IN and OUT. */
-const port: Operand = (text) =>
-  text.startsWith("(") && text.endsWith(")")
-    ? byte(text.slice(1, -1).trim())
-    : undefined;
+const port = inBrackets(byte);
 
-const word = (value: number) => [value & 0xff, (value >> 8) & 0xff];
+/** A number that `accepts` lets through. */
+const numberWhere =
+  (accepts: (n: number) => boolean): Operand =>
+  (text) => {
+    const n = number(text);
+    return n !== undefined && accepts(n) ? n : undefined;
+  };
+
+/** Whether `n` fits in a signed byte. */
+const signedByte = (n: number) => n >= -128 && n <= 127;
+
+/** The two bytes of a 16-bit value, low byte first. */
+export const littleEndian = (value: number) => [
+  value & 0xff,
+  (value >> 8) & 0xff,
+];
 /**
  * JR or DJNZ to `target`: the offset counts from the instruction after their
  * 2 bytes, and reaches from 128 bytes back to 127 forward.
@@ -139,9 +143,9 @@ const relative = (
   address: number,
 ): number[] | TooFar => {
   const distance = target - (address + 2);
-  return distance < -128 || distance > 127
-    ? { kind: "jump-too-far", distance }
-    : [opcode, distance & 0xff];
+  return signedByte(distance)
+    ? [opcode, distance & 0xff]
+    : { kind: "jump-too-far", distance };
 };
 
 const alone = (mnemonic: string, ...bytes: number[]): Form => ({
@@ -184,10 +188,7 @@ const rotateForms = ROTATES.flatMap((mnemonic, rot): Form[] =>
 );
 
 /** A bit number, 0 to 7. */
-const bit: Operand = (text) => {
-  const n = number(text);
-  return n !== undefined && n <= 7 ? n : undefined;
-};
+const bit = numberWhere((n) => n <= 7);
 const bitForms = (["BIT", "RES", "SET"] as const).map(
   (mnemonic, i): Form => ({
     mnemonic,
@@ -238,12 +239,12 @@ const edForms: Form[] = [
   {
     mnemonic: "LD",
     operands: [memory, rp],
-    encode: ([n = 0, p = 0]) => [0xed, 0x43 | (p << 4), ...word(n)],
+    encode: ([n = 0, p = 0]) => [0xed, 0x43 | (p << 4), ...littleEndian(n)],
   },
   {
     mnemonic: "LD",
     operands: [rp, memory],
-    encode: ([p = 0, n = 0]) => [0xed, 0x4b | (p << 4), ...word(n)],
+    encode: ([p = 0, n = 0]) => [0xed, 0x4b | (p << 4), ...littleEndian(n)],
   },
   {
     mnemonic: "SBC",
@@ -303,27 +304,27 @@ const FORMS: readonly Form[] = [
   {
     mnemonic: "LD",
     operands: [rp, word16],
-    encode: ([p = 0, n = 0]) => [0x01 | (p << 4), ...word(n)],
+    encode: ([p = 0, n = 0]) => [0x01 | (p << 4), ...littleEndian(n)],
   },
   {
     mnemonic: "LD",
     operands: [memory, is("HL")],
-    encode: ([n = 0]) => [0x22, ...word(n)],
+    encode: ([n = 0]) => [0x22, ...littleEndian(n)],
   },
   {
     mnemonic: "LD",
     operands: [is("HL"), memory],
-    encode: ([, n = 0]) => [0x2a, ...word(n)],
+    encode: ([, n = 0]) => [0x2a, ...littleEndian(n)],
   },
   {
     mnemonic: "LD",
     operands: [memory, is("A")],
-    encode: ([n = 0]) => [0x32, ...word(n)],
+    encode: ([n = 0]) => [0x32, ...littleEndian(n)],
   },
   {
     mnemonic: "LD",
     operands: [is("A"), memory],
-    encode: ([, n = 0]) => [0x3a, ...word(n)],
+    encode: ([, n = 0]) => [0x3a, ...littleEndian(n)],
   },
   { mnemonic: "INC", operands: [r], encode: ([d = 0]) => [0x04 | (d << 3)] },
   { mnemonic: "DEC", operands: [r], encode: ([d = 0]) => [0x05 | (d << 3)] },
@@ -354,34 +355,29 @@ const FORMS: readonly Form[] = [
   {
     mnemonic: "JP",
     operands: [word16],
-    encode: ([n = 0]) => [0xc3, ...word(n)],
+    encode: ([n = 0]) => [0xc3, ...littleEndian(n)],
   },
   {
     mnemonic: "JP",
     operands: [cc, word16],
-    encode: ([c = 0, n = 0]) => [0xc2 | (c << 3), ...word(n)],
+    encode: ([c = 0, n = 0]) => [0xc2 | (c << 3), ...littleEndian(n)],
   },
   {
     mnemonic: "CALL",
     operands: [word16],
-    encode: ([n = 0]) => [0xcd, ...word(n)],
+    encode: ([n = 0]) => [0xcd, ...littleEndian(n)],
   },
   {
     mnemonic: "CALL",
     operands: [cc, word16],
-    encode: ([c = 0, n = 0]) => [0xc4 | (c << 3), ...word(n)],
+    encode: ([c = 0, n = 0]) => [0xc4 | (c << 3), ...littleEndian(n)],
   },
   { mnemonic: "RET", operands: [cc], encode: ([c = 0]) => [0xc0 | (c << 3)] },
   { mnemonic: "PUSH", operands: [rp2], encode: ([p = 0]) => [0xc5 | (p << 4)] },
   { mnemonic: "POP", operands: [rp2], encode: ([p = 0]) => [0xc1 | (p << 4)] },
   {
     mnemonic: "RST",
-    operands: [
-      (text) => {
-        const n = number(text);
-        return n !== undefined && n % 8 === 0 && n <= 0x38 ? n : undefined;
-      },
-    ],
+    operands: [numberWhere((n) => n % 8 === 0 && n <= 0x38)],
     encode: ([n = 0]) => [0xc7 | n],
   },
   {
@@ -408,8 +404,8 @@ function encodeForm(
   mnemonic: string,
   operands: readonly string[],
   address: number,
-): number[] | Problem {
-  let problem: Problem | undefined;
+): number[] | InstructionProblem {
+  let problem: InstructionProblem | undefined;
   for (const form of FORMS) {
     if (form.mnemonic !== mnemonic || form.operands.length !== operands.length)
       continue;
@@ -445,7 +441,7 @@ export function encodeInstruction(
   mnemonic: string,
   operands: readonly string[],
   address: number,
-): number[] | Problem {
+): number[] | InstructionProblem {
   if (!MNEMONICS.has(mnemonic)) return { kind: "unknown-mnemonic", mnemonic };
   // One prefix per instruction: ADD IX,IY does not exist.
   const indexes = new Set(
@@ -479,7 +475,7 @@ export function encodeInstruction(
   const hlToo = operands.some((operand) => ["HL", "H", "L"].includes(operand));
   if (hlToo && displacement === undefined)
     return { kind: "wrong-operands", mnemonic };
-  if (displacement !== undefined && (displacement < -128 || displacement > 127))
+  if (displacement !== undefined && !signedByte(displacement))
     return { kind: "displacement-out-of-range", displacement };
   const bytes = encodeForm(mnemonic, asHl, address);
   if (!Array.isArray(bytes)) return bytes;
