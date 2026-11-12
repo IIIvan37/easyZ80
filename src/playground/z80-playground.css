@@ -1,0 +1,100 @@
+z80-playground {
+  --z80-border: light-dark(#d0d0d0, #444);
+  --z80-muted: light-dark(#666, #999);
+  --z80-current: light-dark(#fff3b0, #4a4220);
+  --z80-error: light-dark(#b00020, #ff8a80);
+  display: block;
+  margin: 1.5rem 0;
+  color-scheme: light dark;
+}
+
+z80-playground .cm-editor {
+  border: 1px solid var(--z80-border);
+  border-radius: 4px;
+}
+
+z80-playground .z80-errors {
+  margin: 0.5rem 0 0;
+  padding: 0;
+  list-style: none;
+  color: var(--z80-error);
+}
+
+z80-playground .z80-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0.75rem 0;
+}
+
+z80-playground .z80-machine {
+  display: grid;
+  grid-template-columns: 256px auto 1fr;
+  gap: 1rem;
+  align-items: start;
+  font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  font-size: 0.875rem;
+}
+
+/* One beginner's pixel per 8 screen pixels, kept sharp. */
+z80-playground canvas {
+  width: 256px;
+  aspect-ratio: 1;
+  image-rendering: pixelated;
+  border: 1px solid var(--z80-border);
+  background: #000;
+}
+
+z80-playground canvas:focus-visible {
+  outline: 2px solid Highlight;
+  outline-offset: 2px;
+}
+
+z80-playground .z80-cpu {
+  display: flex;
+  gap: 1rem;
+}
+
+z80-playground table {
+  border-collapse: collapse;
+}
+
+z80-playground th {
+  padding-right: 0.5rem;
+  text-align: right;
+  font-weight: normal;
+  color: var(--z80-muted);
+}
+
+z80-playground .z80-listing {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: 256px;
+  overflow: auto;
+}
+
+z80-playground .z80-listing li {
+  padding: 0 0.25rem;
+  white-space: pre;
+}
+
+z80-playground .z80-listing li[aria-current] {
+  background: var(--z80-current);
+}
+
+z80-playground .z80-listing .address,
+z80-playground .z80-listing .bytes {
+  color: var(--z80-muted);
+}
+
+z80-playground .z80-listing .bytes {
+  display: inline-block;
+  min-width: 11ch;
+}
+
+@media (max-width: 640px) {
+  z80-playground .z80-machine {
+    grid-template-columns: 1fr;
+  }
+}

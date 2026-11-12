@@ -1,6 +1,7 @@
 import { assemble } from "../assembler/assemble.ts";
 import { createMachine, type Machine } from "../machine/machine.ts";
 import { explain, type Lang } from "./messages.ts";
+import "./z80-playground.css";
 
 export interface PlaygroundOptions {
   /** The bytes of cell80.wasm; fetched next to this module by default. */
@@ -220,11 +221,22 @@ export function definePlayground({
         lines = assembly.blocks.flatMap(({ address, bytes }) =>
           machine.listing(address, bytes.length).map((line) => {
             const item = document.createElement("li");
-            item.textContent = [
-              hex(line.address, 4),
-              ...line.bytes.map((b) => hex(b, 2).slice(1)),
-              line.text,
-            ].join(" ");
+            const column = (className: string, text: string) => {
+              const span = document.createElement("span");
+              span.className = className;
+              span.textContent = text;
+              return span;
+            };
+            item.append(
+              column("address", hex(line.address, 4)),
+              " ",
+              column(
+                "bytes",
+                line.bytes.map((b) => hex(b, 2).slice(1)).join(" "),
+              ),
+              " ",
+              column("instruction", line.text),
+            );
             return { address: line.address, item };
           }),
         );
@@ -239,15 +251,23 @@ export function definePlayground({
       });
 
       load(original);
+      const box = (className: string, ...children: HTMLElement[]) => {
+        const element = document.createElement("div");
+        element.className = className;
+        element.append(...children);
+        return element;
+      };
+      errors.className = "z80-errors";
+      listing.className = "z80-listing";
       this.append(
-        step,
-        play,
-        reset,
         errors,
-        screen,
-        registers.element,
-        flags.element,
-        listing,
+        box("z80-toolbar", step, play, reset),
+        box(
+          "z80-machine",
+          screen,
+          box("z80-cpu", registers.element, flags.element),
+          listing,
+        ),
       );
 
       // Until CodeMirror loads, the <pre> shows the code the buttons run.
