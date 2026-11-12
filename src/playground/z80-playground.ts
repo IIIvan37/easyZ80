@@ -145,15 +145,18 @@ export function definePlayground({
       screen.height = SCREEN_SIZE;
       screen.tabIndex = 0;
       screen.addEventListener("keydown", (event) => {
+        const code = event.key.toUpperCase().charCodeAt(0);
+        // Port #FF holds one byte: only ASCII keys reach it (ADR 0002).
         if (
           event.key.length !== 1 ||
+          code > 0x7f ||
           event.ctrlKey ||
           event.metaKey ||
           event.altKey
         )
           return;
         event.preventDefault();
-        machine.pressKey(event.key.toUpperCase().charCodeAt(0));
+        machine.pressKey(code);
       });
       // happy-dom has no 2D context: the screen is then left blank.
       const context = screen.getContext("2d");
@@ -258,6 +261,9 @@ export function definePlayground({
           }),
         );
         listing.replaceChildren(...lines.map(({ item }) => item));
+        // A program missing its faulty lines would mislead a beginner: it runs once fixed.
+        for (const control of [step, play, reset])
+          control.disabled = assembly.errors.length > 0;
         render();
       };
 

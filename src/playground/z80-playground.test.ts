@@ -179,6 +179,23 @@ describe("<z80-playground>", () => {
     expect(register(playground, "AF")).toBe("#FFFF");
   });
 
+  it("does not run a program until its errors are fixed", async () => {
+    const playground = await mount("ld a,5\nmov a,b\nhalt");
+    const view = await editorOf(playground);
+    const controls = () =>
+      ["Pas à pas", "Lancer", "Remise à zéro"].map(
+        (label) => button(playground, label).disabled,
+      );
+
+    expect(controls()).toEqual([true, true, true]);
+
+    view.dispatch({
+      changes: { from: 0, to: view.state.doc.length, insert: "ld a,5\nhalt" },
+    });
+
+    expect(controls()).toEqual([false, false, false]);
+  });
+
   it("keeps its program when the page moves it", async () => {
     const playground = await mount("ld a,5\nhalt");
 
@@ -199,6 +216,17 @@ describe("<z80-playground>", () => {
     button(playground, "Pas à pas").click();
 
     expect(register(playground, "AF")).toBe("#41FF");
+  });
+
+  it("gives port #FF only the keys of ASCII", async () => {
+    const playground = await mount("in a,(#FF)\nhalt");
+
+    playground
+      .querySelector("canvas")
+      ?.dispatchEvent(new KeyboardEvent("keydown", { key: "é" }));
+    button(playground, "Pas à pas").click();
+
+    expect(register(playground, "AF")).toBe("#00FF");
   });
 
   it("underlines the errors of the code it starts with", async () => {
