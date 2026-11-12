@@ -10,6 +10,7 @@
   },
   "packageManager": "pnpm@10.34.5",
   "scripts": {
+    "dev": "vite demo",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -22,6 +23,7 @@
     "@types/node": "^24.19.2",
     "happy-dom": "^21.0.4",
     "typescript": "^6.0.3",
+    "vite": "^8.3.8",
     "vitest": "^5.0.5"
   },
   "dependencies": {
