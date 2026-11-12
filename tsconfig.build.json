@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false
+  },
+  // The tests and the helpers only they import: fantams.ts runs the fantams binary through node:child_process.
+  "exclude": [
+    "src/**/*.test.ts",
+    "src/assembler/fantams.ts",
+    "src/assembler/cell80-disassembler.ts"
+  ]
+}
