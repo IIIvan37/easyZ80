@@ -237,6 +237,8 @@ export function definePlayground({
         if (frameRequest !== undefined) return stop();
         frameRequest = requestAnimationFrame(frame);
         play.textContent = texts.pause;
+        // Clicking the button focused it: the keys of a running program go to the screen.
+        screen.focus();
       });
       const reset = button(texts.reset, () => {
         stop();

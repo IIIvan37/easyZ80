@@ -225,6 +225,17 @@ describe("<z80-playground>", () => {
     expect(register(playground, "AF")).toBe("#41FF");
   });
 
+  it("hands the keyboard to the screen when the program starts", async () => {
+    const playground = await mount("loop: in a,(#FF)\njr loop");
+    const run = button(playground, "Lancer");
+
+    // A real click focuses the button first: the keys would go to it.
+    run.focus();
+    run.click();
+
+    expect(document.activeElement).toBe(playground.querySelector("canvas"));
+  });
+
   it("gives port #FF only the keys of ASCII", async () => {
     const playground = await mount("in a,(#FF)\nhalt");
 
