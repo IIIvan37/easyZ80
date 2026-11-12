@@ -1,4 +1,4 @@
-import { encodeInstruction } from "./instructions.ts";
+import { encodeInstruction, type Problem } from "./instructions.ts";
 
 /** Bytes stored from `address` on. */
 export interface Block {
@@ -6,11 +6,8 @@ export interface Block {
   readonly bytes: readonly number[];
 }
 
-/** A mistake in the source, at its 1-based line. */
-export interface AssemblyError {
-  readonly line: number;
-  readonly message: string;
-}
+/** A mistake in the source, at its 1-based line (ADR 0005). */
+export type AssemblyError = { readonly line: number } & Problem;
 
 export interface Assembly {
   readonly blocks: readonly Block[];
@@ -24,17 +21,17 @@ export function assemble(source: string): Assembly {
     const line = rawLine.replace(/;.*/, "").trim();
     if (line === "") continue;
     const encoded = encode(line, bytes.length);
-    if (encoded === undefined) {
-      errors.push({ line: index + 1, message: "unknown instruction" });
-    } else {
+    if (Array.isArray(encoded)) {
       bytes.push(...encoded);
+    } else {
+      errors.push({ line: index + 1, ...encoded });
     }
   }
   return { blocks: [{ address: 0, bytes }], errors };
 }
 
-/** The bytes of one instruction at `address`, or undefined when no form fits. */
-function encode(line: string, address: number): number[] | undefined {
+/** The bytes of one instruction at `address`, or why there are none. */
+function encode(line: string, address: number): number[] | Problem {
   const [mnemonic = "", rest = ""] = line.toUpperCase().split(/\s+(.*)/);
   const operands =
     rest === "" ? [] : rest.split(",").map((operand) => operand.trim());

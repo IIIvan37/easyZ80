@@ -1,8 +1,22 @@
+/** Why a line gives no bytes, as a code with data (ADR 0005). */
+export type Problem =
+  | { readonly kind: "unknown-instruction" }
+  | {
+      readonly kind: "number-too-big";
+      readonly value: number;
+      readonly bits: 8;
+    };
+
+type TooBig = Extract<Problem, { kind: "number-too-big" }>;
+
+const UNKNOWN: Problem = { kind: "unknown-instruction" };
+
 /**
  * Reads one operand as written in the source, upper-cased and trimmed, and
- * returns the value an encoding needs, or undefined when it does not fit.
+ * returns the value an encoding needs, or undefined when it does not fit. A
+ * number out of range returns why, so the beginner learns it is the number.
  */
-type Operand = (text: string) => number | undefined;
+type Operand = (text: string) => number | TooBig | undefined;
 
 interface Form {
   readonly mnemonic: string;
@@ -18,8 +32,8 @@ interface Form {
 }
 
 const among =
-  (names: readonly (string | undefined)[]): Operand =>
-  (text) => {
+  (names: readonly (string | undefined)[]) =>
+  (text: string): number | undefined => {
     const index = names.indexOf(text);
     return index === -1 ? undefined : index;
   };
@@ -74,7 +88,8 @@ export function number(text: string): number | undefined {
 /** A number that fits in 8 bits. */
 const byte: Operand = (text) => {
   const n = number(text);
-  return n !== undefined && n <= 0xff ? n : undefined;
+  if (n === undefined) return undefined;
+  return n <= 0xff ? n : { kind: "number-too-big", value: n, bits: 8 };
 };
 
 /** A number that fits in 16 bits. */
@@ -360,21 +375,30 @@ const FORMS: readonly Form[] = [
   ...edForms,
 ];
 
-/** The bytes of the first form that `mnemonic` and `operands` fit, at `address`. */
+/**
+ * The bytes of the first form that `mnemonic` and `operands` fit, at `address`,
+ * or the problem of the first form that only an operand out of range stops.
+ */
 function encodeForm(
   mnemonic: string,
   operands: readonly string[],
   address: number,
-): number[] | undefined {
+): number[] | Problem {
+  let problem = UNKNOWN;
   for (const form of FORMS) {
     if (form.mnemonic !== mnemonic || form.operands.length !== operands.length)
       continue;
     const values = form.operands.map((read, i) => read(operands[i] ?? ""));
-    if (values.every((value) => value !== undefined)) {
-      return form.encode(values as number[], address);
+    if (values.every((value) => typeof value === "number")) {
+      const bytes = form.encode(values, address);
+      if (bytes !== undefined) return bytes;
+    } else if (problem === UNKNOWN) {
+      const tooBig = values.find((value) => typeof value === "object");
+      if (tooBig && values.every((value) => value !== undefined))
+        problem = tooBig;
     }
   }
-  return undefined;
+  return problem;
 }
 
 const INDEX_PREFIX = { IX: 0xdd, IY: 0xfd } as const;
@@ -383,7 +407,7 @@ const DISPLACED = /^\((I[XY])(?:\s*([+-])\s*(.+))?\)$/;
 
 /**
  * The bytes of one instruction at `address`, operands upper-cased and trimmed,
- * or undefined when no form fits. IX and IY reuse the forms of HL: the operand
+ * or why there are none. IX and IY reuse the forms of HL: the operand
  * is read as HL or (HL), then the prefix goes first and the displacement after
  * the opcode, which also puts it before the opcode of a CB instruction.
  */
@@ -391,12 +415,12 @@ export function encodeInstruction(
   mnemonic: string,
   operands: readonly string[],
   address: number,
-): number[] | undefined {
+): number[] | Problem {
   // One prefix per instruction: ADD IX,IY does not exist.
   const indexes = new Set(
     operands.map((operand) => /\bI[XY]\b/.exec(operand)?.[0]).filter(Boolean),
   );
-  if (indexes.size > 1) return undefined;
+  if (indexes.size > 1) return UNKNOWN;
 
   let prefix: number | undefined;
   let displacement: number | undefined;
@@ -422,13 +446,13 @@ export function encodeInstruction(
   // IX or IY cannot stand next to HL, H or L, unless the index is displaced:
   // LD H,(IX+5) exists, ADD IX,HL does not.
   const hlToo = operands.some((operand) => ["HL", "H", "L"].includes(operand));
-  if (hlToo && displacement === undefined) return undefined;
+  if (hlToo && displacement === undefined) return UNKNOWN;
   if (displacement !== undefined && (displacement < -128 || displacement > 127))
-    return undefined;
+    return UNKNOWN;
   const bytes = encodeForm(mnemonic, asHl, address);
+  if (!Array.isArray(bytes)) return bytes;
   // ED instructions and EX DE,HL have no IX or IY form.
-  if (bytes === undefined || bytes[0] === 0xed || bytes[0] === 0xeb)
-    return undefined;
+  if (bytes[0] === 0xed || bytes[0] === 0xeb) return UNKNOWN;
   const [opcode = 0, ...rest] = bytes;
   return displacement === undefined
     ? [prefix, opcode, ...rest]
