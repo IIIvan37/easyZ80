@@ -3,7 +3,7 @@
   "compilerOptions": {
     "noEmit": false
   },
-  // The tests and the helpers only they import: fantams.ts runs the fantams binary through node:child_process.
+  // The tests and the helpers only they import, which run under Node.
   "exclude": [
     "src/**/*.test.ts",
     "src/assembler/fantams.ts",

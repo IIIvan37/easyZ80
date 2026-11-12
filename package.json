@@ -20,7 +20,7 @@
   ],
   "scripts": {
     "dev": "vite demo",
-    "build": "tsc -p tsconfig.build.json && node scripts/copy-assets.ts",
+    "build": "rm -rf dist && tsc -p tsconfig.build.json && node scripts/copy-assets.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
