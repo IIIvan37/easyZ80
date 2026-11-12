@@ -3,6 +3,7 @@ export type Problem =
   | { readonly kind: "wrong-operands"; readonly mnemonic: string }
   | { readonly kind: "unknown-mnemonic"; readonly mnemonic: string }
   | { readonly kind: "ix-and-iy-together" }
+  | { readonly kind: "misplaced-org" }
   | {
       readonly kind: "number-too-big";
       readonly value: number;
@@ -100,7 +101,7 @@ const fitting =
     return n < 2 ** bits ? n : { kind: "number-too-big", value: n, bits };
   };
 const byte = fitting(8);
-const word16 = fitting(16);
+export const word16 = fitting(16);
 
 /** A number in brackets: the address of a memory access. */
 const memory: Operand = (text) =>

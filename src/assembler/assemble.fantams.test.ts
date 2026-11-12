@@ -43,4 +43,17 @@ describe("assemble, compared with FantAMS", () => {
       " ld a,(ix-16)\n ld (iy+5),#ff\n bit 7,(ix+127)\n jp (ix)\n",
     );
   });
+
+  it("places the program at the address given by org", async () => {
+    await expectSameBytesAsFantams(" org #8000\n ld a,1\n halt\n");
+  });
+
+  it("reads the address of org in lower case", async () => {
+    await expectSameBytesAsFantams(" org #c000\n halt\n");
+  });
+
+  // #7F82 is 128 bytes back from #8002, the address after the JR.
+  it("jumps back as far as a relative jump reaches, after org", async () => {
+    await expectSameBytesAsFantams(" org #8000\n jr #7F82\n");
+  });
 });

@@ -1,4 +1,4 @@
-import { encodeInstruction, type Problem } from "./instructions.ts";
+import { encodeInstruction, type Problem, word16 } from "./instructions.ts";
 
 /** Bytes stored from `address` on. */
 export interface Block {
@@ -15,19 +15,43 @@ export interface Assembly {
 }
 
 export function assemble(source: string): Assembly {
+  let origin = 0;
+  let placed = false;
   const bytes: number[] = [];
   const errors: AssemblyError[] = [];
   for (const [index, rawLine] of source.split("\n").entries()) {
     const line = rawLine.replace(/;.*/, "").trim();
     if (line === "") continue;
-    const encoded = encode(line, bytes.length);
+    const org = /^org\s+(.*)$/i.exec(line);
+    if (org && placed) {
+      errors.push({ line: index + 1, kind: "misplaced-org" });
+      continue;
+    }
+    if (org) {
+      placed = true;
+      const address = word16((org[1] ?? "").toUpperCase());
+      if (address === undefined) {
+        errors.push({
+          line: index + 1,
+          kind: "wrong-operands",
+          mnemonic: "ORG",
+        });
+      } else if (typeof address === "object") {
+        errors.push({ line: index + 1, ...address });
+      } else {
+        origin = address;
+      }
+      continue;
+    }
+    placed = true;
+    const encoded = encode(line, origin + bytes.length);
     if (Array.isArray(encoded)) {
       bytes.push(...encoded);
     } else {
       errors.push({ line: index + 1, ...encoded });
     }
   }
-  return { blocks: [{ address: 0, bytes }], errors };
+  return { blocks: [{ address: origin, bytes }], errors };
 }
 
 /** The bytes of one instruction at `address`, or why there are none. */

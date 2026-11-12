@@ -83,4 +83,35 @@ describe("assemble, mistakes of a beginner", () => {
       displacement,
     });
   });
+
+  it("rejects an org without an address", () => {
+    expectError(" org hello\n", {
+      line: 1,
+      kind: "wrong-operands",
+      mnemonic: "ORG",
+    });
+  });
+
+  it("rejects an org above 65535", () => {
+    expectError(" org 70000\n", {
+      line: 1,
+      kind: "number-too-big",
+      value: 70000,
+      bits: 16,
+    });
+  });
+
+  // One block per program: org comes once, before any instruction.
+  it("rejects a second org", () => {
+    expectError(" org #8000\n org #9000\n", {
+      line: 2,
+      kind: "misplaced-org",
+    });
+  });
+
+  it("rejects an org after an instruction", () => {
+    expect(assemble(" halt\n org #8000\n").errors).toEqual([
+      { line: 2, kind: "misplaced-org" },
+    ]);
+  });
 });
