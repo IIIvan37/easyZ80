@@ -5,6 +5,7 @@ import {
   type Problem,
   word16,
 } from "./instructions.ts";
+import { isReservedWord } from "./reserved-words.ts";
 
 /** Bytes stored from `address` on. */
 export interface Block {
@@ -58,6 +59,12 @@ function pass(
       });
     }
   };
+  /** Whether `name` is a reserved word, which then gets its error. */
+  const reserved = (name: string, line: number) => {
+    if (!isReservedWord(name)) return false;
+    errors.push({ line, kind: "reserved-word", label: name });
+    return true;
+  };
   const unknown = (label: string): Problem => ({
     kind: "unknown-label",
     label,
@@ -73,15 +80,19 @@ function pass(
     let line = withoutComment(rawLine).trim();
     const label = /^([A-Z_]\w*):\s*(.*)$/i.exec(line);
     if (label) {
-      define((label[1] ?? "").toUpperCase(), origin + bytes.length, index + 1);
+      const name = (label[1] ?? "").toUpperCase();
+      // FantAMS reads `halt: nop` as two instructions: skip the whole line.
+      if (reserved(name, index + 1)) continue;
+      define(name, origin + bytes.length, index + 1);
       line = label[2] ?? "";
     }
     if (line === "") continue;
     const equ = /^([A-Z_]\w*)\s+equ\s+(.*)$/i.exec(line);
     if (equ) {
+      const name = (equ[1] ?? "").toUpperCase();
+      if (reserved(name, index + 1)) continue;
       const value = directiveValue("EQU", equ[2] ?? "");
-      if (typeof value === "number")
-        define((equ[1] ?? "").toUpperCase(), value, index + 1);
+      if (typeof value === "number") define(name, value, index + 1);
       else errors.push({ line: index + 1, ...value });
       continue;
     }

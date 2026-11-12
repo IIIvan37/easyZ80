@@ -6,6 +6,7 @@ export type Problem =
   | { readonly kind: "misplaced-org" }
   | { readonly kind: "unknown-label"; readonly label: string }
   | { readonly kind: "size-defined-later"; readonly label: string }
+  | { readonly kind: "reserved-word"; readonly label: string }
   | { readonly kind: "unsupported-character"; readonly character: string }
   | {
       readonly kind: "label-defined-twice";
@@ -426,6 +427,8 @@ function encodeForm(
 }
 
 const MNEMONICS = new Set(FORMS.map((form) => form.mnemonic));
+
+export const isMnemonic = (text: string) => MNEMONICS.has(text);
 
 const INDEX_PREFIX = { IX: 0xdd, IY: 0xfd } as const;
 // `(IX+52)`, `(IY-16)`, `(IX)`; the displacement is a number of the source.

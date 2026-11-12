@@ -193,4 +193,18 @@ describe("assemble, mistakes of a beginner", () => {
   ])("rejects a defs count defined further down: %s", (source, label) => {
     expectError(source, { line: 1, kind: "size-defined-later", label });
   });
+
+  // FantAMS reads these names as an instruction, a register or one of its own
+  // keywords, and starts its own names with `__`.
+  it.each([
+    ["halt: nop\n", "HALT"],
+    ["c:\n", "C"],
+    ["end:\n", "END"],
+    ["org:\n", "ORG"],
+    ["defb:\n", "DEFB"],
+    ["__start:\n", "__START"],
+    ["if equ 1\n", "IF"],
+  ])("rejects a reserved word as a name: %s", (source, label) => {
+    expectError(source, { line: 1, kind: "reserved-word", label });
+  });
 });
