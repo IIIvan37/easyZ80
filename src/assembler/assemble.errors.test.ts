@@ -19,6 +19,15 @@ describe("assemble, mistakes of a beginner", () => {
     });
   });
 
+  it.each([
+    [" ld a,bc\n", "LD"],
+    [" ld bc\n", "LD"],
+    [" add ix,hl\n", "ADD"],
+    [" ex de,ix\n", "EX"],
+  ])("rejects operands the mnemonic does not take: %s", (source, mnemonic) => {
+    expectError(source, { line: 1, kind: "wrong-operands", mnemonic });
+  });
+
   it("rejects IX and IY in the same instruction", () => {
     expectError(" add ix,iy\n", { line: 1, kind: "ix-and-iy-together" });
   });

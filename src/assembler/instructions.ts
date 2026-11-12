@@ -1,6 +1,6 @@
 /** Why a line gives no bytes, as a code with data (ADR 0005). */
 export type Problem =
-  | { readonly kind: "unknown-instruction" }
+  | { readonly kind: "wrong-operands"; readonly mnemonic: string }
   | { readonly kind: "unknown-mnemonic"; readonly mnemonic: string }
   | { readonly kind: "ix-and-iy-together" }
   | {
@@ -16,8 +16,6 @@ export type Problem =
 
 type TooBig = Extract<Problem, { kind: "number-too-big" }>;
 type TooFar = Extract<Problem, { kind: "jump-too-far" }>;
-
-const UNKNOWN: Problem = { kind: "unknown-instruction" };
 
 /**
  * Reads one operand as written in the source, upper-cased and trimmed, and
@@ -390,14 +388,14 @@ const FORMS: readonly Form[] = [
 /**
  * The bytes of the first form that `mnemonic` and `operands` fit, at `address`,
  * or the problem of the first form that only a number or a jump out of range
- * stops.
+ * stops, or else wrong operands.
  */
 function encodeForm(
   mnemonic: string,
   operands: readonly string[],
   address: number,
 ): number[] | Problem {
-  let problem = UNKNOWN;
+  let problem: Problem | undefined;
   for (const form of FORMS) {
     if (form.mnemonic !== mnemonic || form.operands.length !== operands.length)
       continue;
@@ -405,14 +403,14 @@ function encodeForm(
     if (values.every((value) => typeof value === "number")) {
       const bytes = form.encode(values, address);
       if (Array.isArray(bytes)) return bytes;
-      if (problem === UNKNOWN) problem = bytes;
-    } else if (problem === UNKNOWN) {
+      problem ??= bytes;
+    } else if (problem === undefined) {
       const tooBig = values.find((value) => typeof value === "object");
       if (tooBig && values.every((value) => value !== undefined))
         problem = tooBig;
     }
   }
-  return problem;
+  return problem ?? { kind: "wrong-operands", mnemonic };
 }
 
 const MNEMONICS = new Set(FORMS.map((form) => form.mnemonic));
@@ -463,13 +461,15 @@ export function encodeInstruction(
   // IX or IY cannot stand next to HL, H or L, unless the index is displaced:
   // LD H,(IX+5) exists, ADD IX,HL does not.
   const hlToo = operands.some((operand) => ["HL", "H", "L"].includes(operand));
-  if (hlToo && displacement === undefined) return UNKNOWN;
+  if (hlToo && displacement === undefined)
+    return { kind: "wrong-operands", mnemonic };
   if (displacement !== undefined && (displacement < -128 || displacement > 127))
     return { kind: "displacement-out-of-range", displacement };
   const bytes = encodeForm(mnemonic, asHl, address);
   if (!Array.isArray(bytes)) return bytes;
   // ED instructions and EX DE,HL have no IX or IY form.
-  if (bytes[0] === 0xed || bytes[0] === 0xeb) return UNKNOWN;
+  if (bytes[0] === 0xed || bytes[0] === 0xeb)
+    return { kind: "wrong-operands", mnemonic };
   const [opcode = 0, ...rest] = bytes;
   return displacement === undefined
     ? [prefix, opcode, ...rest]
