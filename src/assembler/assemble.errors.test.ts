@@ -10,6 +10,15 @@ function expectError(source: string, error: AssemblyError) {
 }
 
 describe("assemble, mistakes of a beginner", () => {
+  // The playground quotes the line itself; the code names the word, upper-cased.
+  it("rejects a mnemonic the Z80 does not have", () => {
+    expectError(" mov a,1\n", {
+      line: 1,
+      kind: "unknown-mnemonic",
+      mnemonic: "MOV",
+    });
+  });
+
   it("rejects IX and IY in the same instruction", () => {
     expectError(" add ix,iy\n", { line: 1, kind: "ix-and-iy-together" });
   });

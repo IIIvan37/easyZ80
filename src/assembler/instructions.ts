@@ -1,6 +1,7 @@
 /** Why a line gives no bytes, as a code with data (ADR 0005). */
 export type Problem =
   | { readonly kind: "unknown-instruction" }
+  | { readonly kind: "unknown-mnemonic"; readonly mnemonic: string }
   | { readonly kind: "ix-and-iy-together" }
   | {
       readonly kind: "number-too-big";
@@ -414,6 +415,8 @@ function encodeForm(
   return problem;
 }
 
+const MNEMONICS = new Set(FORMS.map((form) => form.mnemonic));
+
 const INDEX_PREFIX = { IX: 0xdd, IY: 0xfd } as const;
 // `(IX+52)`, `(IY-16)`, `(IX)`; the displacement is a number of the source.
 const DISPLACED = /^\((I[XY])(?:\s*([+-])\s*(.+))?\)$/;
@@ -429,6 +432,7 @@ export function encodeInstruction(
   operands: readonly string[],
   address: number,
 ): number[] | Problem {
+  if (!MNEMONICS.has(mnemonic)) return { kind: "unknown-mnemonic", mnemonic };
   // One prefix per instruction: ADD IX,IY does not exist.
   const indexes = new Set(
     operands.map((operand) => /\bI[XY]\b/.exec(operand)?.[0]).filter(Boolean),
