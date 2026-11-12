@@ -77,6 +77,12 @@ const memory: Operand = (text) =>
     ? number(text.slice(1, -1).trim())
     : undefined;
 
+/** A port number in brackets, for IN and OUT. */
+const port: Operand = (text) =>
+  text.startsWith("(") && text.endsWith(")")
+    ? byte(text.slice(1, -1).trim())
+    : undefined;
+
 const word = (value: number) => [value & 0xff, (value >> 8) & 0xff];
 /** The offset of a relative jump to `target`, from the instruction after the 2 bytes of JR or DJNZ. */
 const offset = (target: number, address: number) =>
@@ -324,13 +330,13 @@ const FORMS: readonly Form[] = [
   },
   {
     mnemonic: "OUT",
-    operands: [memory, is("A")],
-    encode: ([n = 0]) => [0xd3, n & 0xff],
+    operands: [port, is("A")],
+    encode: ([n = 0]) => [0xd3, n],
   },
   {
     mnemonic: "IN",
-    operands: [is("A"), memory],
-    encode: ([, n = 0]) => [0xdb, n & 0xff],
+    operands: [is("A"), port],
+    encode: ([, n = 0]) => [0xdb, n],
   },
   ...rotateForms,
   ...bitForms,

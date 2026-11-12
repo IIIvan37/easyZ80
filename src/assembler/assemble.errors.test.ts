@@ -16,4 +16,8 @@ describe("assemble, mistakes of a beginner", () => {
   it("rejects a number too big for an 8-bit register", () => {
     expectErrorAtLine(" ld a,300\n", 1);
   });
+
+  it("rejects a port number above 255", () => {
+    expectErrorAtLine(" out (300),a\n", 1);
+  });
 });
