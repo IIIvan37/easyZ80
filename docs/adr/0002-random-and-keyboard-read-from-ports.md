@@ -14,3 +14,4 @@ easy6502 maps its random byte at `$fe` and its last key at `$ff` in memory. easy
 - The tutorial introduces `IN` early, in the chapter that first needs randomness or a key.
 - Reading a key clears it, so a program never sees the same press twice and needs no write to acknowledge it, unlike easy6502.
 - The ports are decoded on the low byte only: `IN A,(n)` puts A on the high byte of the address bus.
+- A program placed by `org` starts at its first byte, not at `#0000`: the machine sets PC to the first block it loads.

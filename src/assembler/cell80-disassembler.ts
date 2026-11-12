@@ -1,21 +1,5 @@
 import { readFileSync } from "node:fs";
 
-// Node has WebAssembly, but @types/node does not declare it; these are the parts used here.
-declare global {
-  namespace WebAssembly {
-    class Module {
-      constructor(bytes: Uint8Array);
-    }
-    class Instance {
-      constructor(module: Module, imports: Record<string, object>);
-      readonly exports: Record<string, unknown>;
-    }
-    class Memory {
-      readonly buffer: ArrayBuffer;
-    }
-  }
-}
-
 interface Exports {
   readonly memory: WebAssembly.Memory;
   text_ptr(): number;
