@@ -65,7 +65,9 @@ function pass(
   const definedAt = new Map<string, number>();
   const bytes: number[] = [];
   const errors: AssemblyError[] = [];
-  const define = (name: string, value: number, line: number) => {
+  /** Defines `written`, which names match whatever their case. */
+  const define = (written: string, value: number, line: number) => {
+    const name = written.toUpperCase();
     const firstLine = definedAt.get(name);
     if (firstLine === undefined) {
       definedAt.set(name, line);
@@ -74,15 +76,15 @@ function pass(
       errors.push({
         line,
         kind: "label-defined-twice",
-        label: name,
+        label: written,
         firstLine,
       });
     }
   };
-  /** Whether `name` is a reserved word, which then gets its error. */
-  const reserved = (name: string, line: number) => {
-    if (!isReservedWord(name)) return false;
-    errors.push({ line, kind: "reserved-word", label: name });
+  /** Whether `written` is a reserved word, which then gets its error. */
+  const reserved = (written: string, line: number) => {
+    if (!isReservedWord(written.toUpperCase())) return false;
+    errors.push({ line, kind: "reserved-word", label: written });
     return true;
   };
   const addressOr =
@@ -102,7 +104,7 @@ function pass(
     let text = withoutComment(rawLine).trim();
     const label = /^([A-Z_]\w*):\s*(.*)$/i.exec(text);
     if (label) {
-      const name = (label[1] ?? "").toUpperCase();
+      const name = label[1] ?? "";
       // FantAMS reads `halt: nop` as two instructions: skip the whole line.
       if (reserved(name, line)) continue;
       if (here >= MEMORY_END) errors.push({ line, kind: "past-end-of-memory" });
@@ -112,7 +114,7 @@ function pass(
     if (text === "") continue;
     const equ = /^([A-Z_]\w*)\s+equ\s+(.*)$/i.exec(text);
     if (equ) {
-      const name = (equ[1] ?? "").toUpperCase();
+      const name = equ[1] ?? "";
       if (reserved(name, line)) continue;
       const value = read(word16, "EQU", (equ[2] ?? "").toUpperCase());
       if (typeof value === "number") define(name, value, line);
@@ -188,7 +190,7 @@ function encode(
   const lookup = mnemonic === "DEFS" ? sizeOf : addressOf;
   const operands: string[] = [];
   for (const text of rest === "" ? [] : splitOperands(rest)) {
-    const operand = isText(text) ? text : resolve(text.toUpperCase(), lookup);
+    const operand = isText(text) ? text : resolve(text, lookup);
     if (typeof operand === "object") return operand;
     operands.push(operand);
   }
@@ -197,16 +199,19 @@ function encode(
 }
 
 /**
- * `operand` with a label, alone or in brackets, replaced by its value, or why
- * the label cannot be used.
+ * `operand`, upper-cased, with a label, alone or in brackets, replaced by its
+ * value, or why the label cannot be used, named as written.
  */
 function resolve(operand: string, lookup: Lookup): string | Problem {
-  const [, open = "", name = "", close = ""] =
-    /^(\(?)([A-Z_]\w*)(\)?)$/.exec(operand) ?? [];
+  const upper = operand.toUpperCase();
+  const [, open = "", written = "", close = ""] =
+    /^(\(?)([A-Z_]\w*)(\)?)$/i.exec(operand) ?? [];
+  const name = written.toUpperCase();
   if (name === "" || isRegister(name) || open.length !== close.length)
-    return operand;
+    return upper;
   const value = lookup(name);
-  if (typeof value === "object") return value;
+  if (typeof value === "object")
+    return "label" in value ? { ...value, label: written } : value;
   return `${open}#${value.toString(16).toUpperCase()}${close}`;
 }
 
