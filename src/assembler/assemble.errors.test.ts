@@ -10,7 +10,7 @@ function expectError(source: string, error: AssemblyError) {
 }
 
 describe("assemble, mistakes of a beginner", () => {
-  // The playground quotes the line itself; the code names the word, upper-cased.
+  // The playground quotes the line itself; the code names a mnemonic upper-cased, a name as written.
   it("rejects a mnemonic the Z80 does not have", () => {
     expectError(" mov a,1\n", {
       line: 1,
@@ -119,7 +119,7 @@ describe("assemble, mistakes of a beginner", () => {
     expectError(" jp nowhere\n", {
       line: 1,
       kind: "unknown-label",
-      label: "NOWHERE",
+      label: "nowhere",
     });
   });
 
@@ -127,7 +127,7 @@ describe("assemble, mistakes of a beginner", () => {
     expectError("loop:\n\nloop:\n", {
       line: 3,
       kind: "label-defined-twice",
-      label: "LOOP",
+      label: "loop",
       firstLine: 1,
     });
   });
@@ -136,7 +136,7 @@ describe("assemble, mistakes of a beginner", () => {
     expectError("white equ 1\nwhite equ 2\n", {
       line: 2,
       kind: "label-defined-twice",
-      label: "WHITE",
+      label: "white",
       firstLine: 1,
     });
   });
@@ -181,15 +181,15 @@ describe("assemble, mistakes of a beginner", () => {
     [" defw 'ab'\n", { line: 1, kind: "wrong-operands", mnemonic: "DEFW" }],
     [" defs\n", { line: 1, kind: "wrong-operands", mnemonic: "DEFS" }],
     [" defs 1,2,3\n", { line: 1, kind: "wrong-operands", mnemonic: "DEFS" }],
-    [" defb nowhere\n", { line: 1, kind: "unknown-label", label: "NOWHERE" }],
+    [" defb nowhere\n", { line: 1, kind: "unknown-label", label: "nowhere" }],
   ])("rejects data that does not fit: %s", (source, error) => {
     expectError(source, error);
   });
 
   // FantAMS sizes the program in its first pass: a DEFS count must be known by then.
   it.each([
-    [" defs size\nsize equ 2\n", "SIZE"],
-    [" defs here\nhere:\n", "HERE"],
+    [" defs size\nsize equ 2\n", "size"],
+    [" defs here\nhere:\n", "here"],
   ])("rejects a defs count defined further down: %s", (source, label) => {
     expectError(source, { line: 1, kind: "size-defined-later", label });
   });
@@ -197,13 +197,13 @@ describe("assemble, mistakes of a beginner", () => {
   // FantAMS reads these names as an instruction, a register or one of its own
   // keywords, and starts its own names with `__`.
   it.each([
-    ["halt: nop\n", "HALT"],
-    ["c:\n", "C"],
-    ["end:\n", "END"],
-    ["org:\n", "ORG"],
-    ["defb:\n", "DEFB"],
-    ["__start:\n", "__START"],
-    ["if equ 1\n", "IF"],
+    ["halt: nop\n", "halt"],
+    ["c:\n", "c"],
+    ["end:\n", "end"],
+    ["org:\n", "org"],
+    ["defb:\n", "defb"],
+    ["__start:\n", "__start"],
+    ["if equ 1\n", "if"],
   ])("rejects a reserved word as a name: %s", (source, label) => {
     expectError(source, { line: 1, kind: "reserved-word", label });
   });
@@ -227,5 +227,24 @@ describe("assemble, mistakes of a beginner", () => {
       blocks: [{ address: 0xffff, bytes: [0] }],
       errors: [],
     });
+  });
+});
+
+describe("assemble, names in errors", () => {
+  // Names match whatever their case; the error keeps the spelling of its line,
+  // so the sentence quotes what the beginner typed.
+  it.each<[string, AssemblyError]>([
+    [" jr far\n", { line: 1, kind: "unknown-label", label: "far" }],
+    [
+      "Loop:\nloop:\n",
+      { line: 2, kind: "label-defined-twice", label: "loop", firstLine: 1 },
+    ],
+    ["Halt:\n", { line: 1, kind: "reserved-word", label: "Halt" }],
+    [
+      " defs Size\nsize equ 2\n",
+      { line: 1, kind: "size-defined-later", label: "Size" },
+    ],
+  ])("keeps the name as written: %j", (source, error) => {
+    expect(assemble(source).errors).toEqual([error]);
   });
 });

@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>easyZ80 demo</title>
+    <script type="module" src="./main.ts"></script>
+  </head>
+  <body>
+    <h1>easyZ80</h1>
+
+    <h2>Pixels au hasard</h2>
+    <z80-playground><pre>
+; remplit l'écran de couleurs au hasard
+        ld hl,#4000
+loop:   in a,(#FE)
+        ld (hl),a
+        inc hl
+        ld a,h
+        cp #44
+        jr nz,loop
+        halt</pre></z80-playground>
+
+    <h2>Une touche, une couleur</h2>
+    <z80-playground><pre>
+; cliquer sur l'écran, puis taper des touches
+loop:   in a,(#FF)
+        or a
+        jr z,loop
+        ld (#4210),a
+        jr loop</pre></z80-playground>
+
+    <h2>Erreurs</h2>
+    <z80-playground><pre>
+        ld a,300
+        mov a,b
+        halt</pre></z80-playground>
+
+    <section lang="en">
+      <h2>In English</h2>
+      <z80-playground><pre>
+        ld a,5
+        ld (#4000),a
+        jr far
+        halt</pre></z80-playground>
+    </section>
+  </body>
+</html>

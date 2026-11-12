@@ -1,33 +1,12 @@
 import { readFileSync } from "node:fs";
-
-// Node has WebAssembly, but @types/node does not declare it; these are the parts used here.
-declare global {
-  namespace WebAssembly {
-    class Module {
-      constructor(bytes: Uint8Array);
-    }
-    class Instance {
-      constructor(module: Module, imports: Record<string, object>);
-      readonly exports: Record<string, unknown>;
-    }
-    class Memory {
-      readonly buffer: ArrayBuffer;
-    }
-  }
-}
-
-interface Exports {
-  readonly memory: WebAssembly.Memory;
-  text_ptr(): number;
-  disassemble(pc: number, bytes: number): number;
-}
+import { type Cell80, decode, NO_DEVICES } from "../cpu/cell80.ts";
 
 const cell80 = new WebAssembly.Instance(
   new WebAssembly.Module(
     readFileSync(new URL("../cpu/cell80.wasm", import.meta.url)),
   ),
-  { env: { io_in: () => 0xff, io_out: () => {} } },
-).exports as unknown as Exports;
+  NO_DEVICES,
+).exports as unknown as Cell80;
 
 /**
  * The instruction that `bytes` start with, decoded by cell80 at address 0: the
@@ -38,16 +17,7 @@ export function disassemble(bytes: readonly number[]): {
   text: string;
   length: number;
 } {
-  const firstFourBytes = [0, 1, 2, 3].reduce(
-    (word, i) => word + (bytes[i] ?? 0) * 2 ** (8 * i),
-    0,
-  );
-  // The instruction's length in the high byte, the text's length in the low byte.
-  const lengths = cell80.disassemble(0, firstFourBytes);
-  const text = new TextDecoder().decode(
-    new Uint8Array(cell80.memory.buffer, cell80.text_ptr(), lengths & 0xff),
-  );
-  return { text: text.replaceAll("$", "#"), length: lengths >> 8 };
+  return decode(cell80, 0, (i) => bytes[i] ?? 0);
 }
 
 // Forms cell80 decodes that are not documented by Zilog, or not instructions at all.
