@@ -1,6 +1,8 @@
 // @vitest-environment happy-dom
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { forEachDiagnostic } from "@codemirror/lint";
+import { EditorView } from "@codemirror/view";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import { definePlayground } from "./z80-playground.ts";
 
@@ -47,6 +49,24 @@ function errors(playground: HTMLElement) {
   return [...playground.querySelectorAll("[role=alert] li")].map(
     (li) => li.textContent,
   );
+}
+
+/** The CodeMirror editor, once it has replaced the <pre>. */
+function editorOf(playground: HTMLElement) {
+  return vi.waitFor(() => {
+    const editor = playground.querySelector<HTMLElement>(".cm-editor");
+    const view = editor && EditorView.findFromDOM(editor);
+    if (!view) throw new Error("No editor yet");
+    return view;
+  });
+}
+
+function underlinedLines(view: EditorView) {
+  const lines: number[] = [];
+  forEachDiagnostic(view.state, (_, from) =>
+    lines.push(view.state.doc.lineAt(from).number),
+  );
+  return lines;
 }
 
 describe("<z80-playground>", () => {
@@ -142,5 +162,34 @@ describe("<z80-playground>", () => {
     button(playground, "Pas à pas").click();
 
     expect(register(playground, "AF")).toBe("#41FF");
+  });
+
+  it("underlines the errors of the code it starts with", async () => {
+    const view = await editorOf(await mount("ld a,300\nhalt"));
+
+    expect(underlinedLines(view)).toEqual([1]);
+  });
+
+  it("assembles the code again on each edit", async () => {
+    const playground = await mount("ld a,5\nhalt");
+    const view = await editorOf(playground);
+    expect(playground.querySelector("pre")).toBeNull();
+
+    const replace = (insert: string) =>
+      view.dispatch({
+        changes: { from: 0, to: view.state.doc.length, insert },
+      });
+    replace("ld a,7\nmov a,b\nhalt");
+
+    expect(errors(playground)).toEqual([
+      "Ligne 2 : MOV n'est pas une instruction du Z80.",
+    ]);
+    expect(underlinedLines(view)).toEqual([2]);
+
+    replace("ld a,7\nhalt");
+    button(playground, "Pas à pas").click();
+
+    expect(errors(playground)).toEqual([]);
+    expect(register(playground, "AF")).toBe("#07FF");
   });
 });

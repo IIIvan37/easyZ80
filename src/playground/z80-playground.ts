@@ -103,20 +103,14 @@ export function definePlayground({
     }
 
     async enhance() {
-      const source = this.querySelector("pre")?.textContent ?? "";
+      const pre = this.querySelector("pre");
+      const original = pre?.textContent ?? "";
       const lang = langOf(this);
       const labels = LABELS[lang];
       const machine: Machine = await createMachine(await wasm());
-      const assembly = assemble(source);
-      machine.load(assembly.blocks);
 
       const errors = document.createElement("ul");
       errors.setAttribute("role", "alert");
-      for (const error of assembly.errors) {
-        const item = document.createElement("li");
-        item.textContent = labels.atLine(error.line, explain(error, lang));
-        errors.append(item);
-      }
 
       /** A table of names and values; returns the value cells, in order. */
       const table = (names: readonly string[]) => {
@@ -134,18 +128,7 @@ export function definePlayground({
       const flags = table(FLAGS.map(([name]) => name));
 
       const listing = document.createElement("ol");
-      const lines = assembly.blocks.flatMap(({ address, bytes }) =>
-        machine.listing(address, bytes.length).map((line) => {
-          const item = document.createElement("li");
-          item.textContent = [
-            hex(line.address, 4),
-            ...line.bytes.map((b) => hex(b, 2).slice(1)),
-            line.text,
-          ].join(" ");
-          listing.append(item);
-          return { address: line.address, item };
-        }),
-      );
+      let lines: { address: number; item: HTMLLIElement }[] = [];
 
       const screen = document.createElement("canvas");
       screen.width = SCREEN_SIZE;
@@ -220,13 +203,42 @@ export function definePlayground({
         setRunning(!running);
         if (running) requestAnimationFrame(frame);
       });
+
+      let assembly = assemble(original);
+      /** Assembles the code, loads it and shows its errors and listing. */
+      const load = (source: string) => {
+        assembly = assemble(source);
+        setRunning(false);
+        machine.load(assembly.blocks);
+        errors.replaceChildren(
+          ...assembly.errors.map((error) => {
+            const item = document.createElement("li");
+            item.textContent = labels.atLine(error.line, explain(error, lang));
+            return item;
+          }),
+        );
+        lines = assembly.blocks.flatMap(({ address, bytes }) =>
+          machine.listing(address, bytes.length).map((line) => {
+            const item = document.createElement("li");
+            item.textContent = [
+              hex(line.address, 4),
+              ...line.bytes.map((b) => hex(b, 2).slice(1)),
+              line.text,
+            ].join(" ");
+            return { address: line.address, item };
+          }),
+        );
+        listing.replaceChildren(...lines.map(({ item }) => item));
+        render();
+      };
+
       const reset = button(labels.reset, () => {
         setRunning(false);
         machine.load(assembly.blocks);
         render();
       });
 
-      render();
+      load(original);
       this.append(
         step,
         play,
@@ -237,6 +249,45 @@ export function definePlayground({
         flags.element,
         listing,
       );
+
+      // Until CodeMirror loads, the <pre> shows the code the buttons run.
+      const [{ basicSetup }, { EditorView }, { setDiagnostics }] =
+        await Promise.all([
+          import("codemirror"),
+          import("@codemirror/view"),
+          import("@codemirror/lint"),
+        ]);
+      /** Underlines the line of each error of the code last loaded. */
+      const underline = (view: InstanceType<typeof EditorView>) => {
+        const { doc } = view.state;
+        const diagnostics = assembly.errors.map((error) => {
+          const line = doc.line(Math.min(error.line, doc.lines));
+          return {
+            from: line.from,
+            to: line.to,
+            severity: "error" as const,
+            message: explain(error, lang),
+          };
+        });
+        view.update([
+          view.state.update(setDiagnostics(view.state, diagnostics)),
+        ]);
+      };
+      const view = new EditorView({
+        doc: original,
+        extensions: [basicSetup],
+        // Synchronous, so the errors are underlined in the same update as the edit.
+        dispatchTransactions(transactions, view) {
+          view.update(transactions);
+          if (!transactions.some((transaction) => transaction.docChanged))
+            return;
+          load(view.state.doc.toString());
+          underline(view);
+        },
+      });
+      underline(view);
+      if (pre) pre.replaceWith(view.dom);
+      else this.prepend(view.dom);
     }
   }
   customElements.define("z80-playground", Z80Playground);
