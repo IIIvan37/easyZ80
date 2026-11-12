@@ -1,0 +1,26 @@
+{
+  "name": "easyz80",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Machine, assembler and playground element of a Z80 tutorial for beginners",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "packageManager": "pnpm@10.34.5",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "check": "biome check .",
+    "check:fix": "biome check . --write",
+    "gate": "pnpm typecheck && pnpm check && pnpm test"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.6.2",
+    "@types/node": "^24.19.2",
+    "typescript": "^6.0.3",
+    "vitest": "^5.0.5"
+  }
+}
