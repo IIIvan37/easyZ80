@@ -65,6 +65,12 @@ export function number(text: string): number | undefined {
   return undefined;
 }
 
+/** A number that fits in 8 bits. */
+const byte: Operand = (text) => {
+  const n = number(text);
+  return n !== undefined && n <= 0xff ? n : undefined;
+};
+
 /** A number in brackets: the address of a memory access. */
 const memory: Operand = (text) =>
   text.startsWith("(") && text.endsWith(")")
@@ -95,8 +101,8 @@ const aluForms = ALU.flatMap((mnemonic, alu): Form[] => {
     },
     {
       mnemonic,
-      operands: [...target, number],
-      encode: (v) => [0xc6 | (alu << 3), (v.at(-1) ?? 0) & 0xff],
+      operands: [...target, byte],
+      encode: (v) => [0xc6 | (alu << 3), v.at(-1) ?? 0],
     },
   ];
 });
@@ -229,8 +235,8 @@ const FORMS: readonly Form[] = [
   },
   {
     mnemonic: "LD",
-    operands: [r, number],
-    encode: ([d = 0, n = 0]) => [0x06 | (d << 3), n & 0xff],
+    operands: [r, byte],
+    encode: ([d = 0, n = 0]) => [0x06 | (d << 3), n],
   },
   {
     mnemonic: "LD",

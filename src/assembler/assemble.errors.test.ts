@@ -12,4 +12,8 @@ describe("assemble, mistakes of a beginner", () => {
   it("rejects IX and IY in the same instruction", () => {
     expectErrorAtLine(" add ix,iy\n", 1);
   });
+
+  it("rejects a number too big for an 8-bit register", () => {
+    expectErrorAtLine(" ld a,300\n", 1);
+  });
 });
