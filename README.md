@@ -4,4 +4,37 @@ An interactive tutorial that teaches Z80 assembly to complete beginners, in the 
 
 This repository holds the library: the machine, the assembler and the `<z80-playground>` custom element. The lessons live in the blog, in a section of their own ([ADR 0004](docs/adr/0004-lessons-live-in-the-blog-as-their-own-section.md)).
 
-> **Status:** design. The decisions are in [docs/adr/](docs/adr/). A throwaway prototype that runs hand-assembled programs on the Z80 core lives on branch `prototype/wasm-chain`.
+> **Status:** first release, v0.1.0. The decisions are in [docs/adr/](docs/adr/).
+
+## Installation
+
+easyZ80 runs in the browser, through a bundler that handles CSS imports and `new URL(..., import.meta.url)`, such as Vite or Astro.
+
+1. Add easyZ80 to the site. It comes from the tarball of [its GitHub release](https://github.com/IIIvan37/easyZ80/releases/tag/v0.1.0):
+
+   ```sh
+   pnpm add https://github.com/IIIvan37/easyZ80/releases/download/v0.1.0/easyz80-0.1.0.tgz
+   ```
+
+2. Register the element once, in a script of the page:
+
+   ```ts
+   import { definePlayground } from "easyz80";
+
+   definePlayground();
+   ```
+
+3. Put the program in a `<pre>` inside the element. The labels are in French when the closest `lang` attribute starts with `fr`, in English otherwise:
+
+   ```html
+   <z80-playground><pre>
+   start:
+     ld a, 1
+     ld (#4000), a
+     halt
+   </pre></z80-playground>
+   ```
+
+## Release
+
+From `main`: `pnpm pack`, which builds first, then `gh release create vX.Y.Z` with the tarball. Each release updates the version in the installation step.

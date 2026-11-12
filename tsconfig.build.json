@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.json",
+  // Only what the entry reaches, without Node's types: a node: import in the package fails here.
+  "compilerOptions": {
+    "noEmit": false,
+    "types": []
+  },
+  "include": [],
+  "files": ["src/index.ts", "src/css.d.ts"]
+}
