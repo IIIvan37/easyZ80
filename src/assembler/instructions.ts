@@ -363,6 +363,12 @@ export function encodeInstruction(
   operands: readonly string[],
   address: number,
 ): number[] | undefined {
+  // One prefix per instruction: ADD IX,IY does not exist.
+  const indexes = new Set(
+    operands.map((operand) => /\bI[XY]\b/.exec(operand)?.[0]).filter(Boolean),
+  );
+  if (indexes.size > 1) return undefined;
+
   let prefix: number | undefined;
   let displacement: number | undefined;
   const asHl = operands.map((operand) => {
