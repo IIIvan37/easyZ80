@@ -1,6 +1,6 @@
 {
   "name": "easyz80",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "Machine, assembler and playground element of a Z80 tutorial for beginners",
   "license": "MIT",

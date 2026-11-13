@@ -1,31 +1,13 @@
 // @vitest-environment happy-dom
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import { forEachDiagnostic } from "@codemirror/lint";
 import { EditorView } from "@codemirror/view";
 import { beforeAll, describe, expect, it, vi } from "vitest";
+import { mount, wasm } from "./test-page.ts";
 import { definePlayground } from "./z80-playground.ts";
-
-// Under happy-dom, import.meta.url is not a file: URL, so the path is built from the folder.
-const wasm = readFileSync(join(import.meta.dirname, "../cpu/cell80.wasm"));
 
 beforeAll(() => {
   definePlayground({ wasm: async () => wasm });
 });
-
-/** A playground as the blog writes it: the highlighted code in a <pre>. */
-async function mount(source: string, lang = "fr") {
-  const page = document.createElement("div");
-  page.lang = lang;
-  const playground = document.createElement("z80-playground");
-  const pre = document.createElement("pre");
-  pre.textContent = source;
-  playground.append(pre);
-  page.append(playground);
-  document.body.replaceChildren(page);
-  await vi.waitFor(() => expect(button(playground, /./)).toBeTruthy());
-  return playground;
-}
 
 function button(playground: HTMLElement, label: RegExp | string) {
   const found = [...playground.querySelectorAll("button")].find((b) =>
