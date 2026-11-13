@@ -8,10 +8,30 @@ import {
 import { explain, type Lang } from "./messages.ts";
 import "./z80-playground.css";
 
+/** What a toolbar button does; the run button turns into pause while the program runs. */
+export type PlaygroundAction = "step" | "run" | "pause" | "reset";
+
 export interface PlaygroundOptions {
   /** The bytes of cell80.wasm; fetched next to this module by default. */
   readonly wasm?: () => Promise<Uint8Array<ArrayBuffer>>;
+  /** Gives the toolbar buttons the site's own look; they show their label as text by default. */
+  readonly drawButton?: DrawButton;
 }
+
+/**
+ * Draws a toolbar button: called when the button is made, and again each time
+ * run and pause swap. `label` is in the page's language; a button without text
+ * needs it as its accessible name.
+ */
+export type DrawButton = (
+  button: HTMLButtonElement,
+  action: PlaygroundAction,
+  label: string,
+) => void;
+
+const drawLabel: DrawButton = (button, _action, label) => {
+  button.textContent = label;
+};
 
 /** The words the playground shows, in one language. */
 interface Texts {
@@ -120,14 +140,6 @@ function table(names: readonly string[]) {
   return { element, show };
 }
 
-function button(text: string, onClick: () => void) {
-  const element = document.createElement("button");
-  element.type = "button";
-  element.textContent = text;
-  element.addEventListener("click", onClick);
-  return element;
-}
-
 function box(className: string, ...children: HTMLElement[]) {
   const element = document.createElement("div");
   element.className = className;
@@ -145,6 +157,7 @@ function span(className: string, text: string) {
 /** Registers `<z80-playground>`, which turns the code of its `<pre>` into a running Z80. */
 export function definePlayground({
   wasm = fetchWasm,
+  drawButton = drawLabel,
 }: PlaygroundOptions = {}): void {
   // Every playground of the page runs the same cell80: fetch it once.
   let wasmBytes: Promise<Uint8Array<ArrayBuffer>> | undefined;
@@ -169,6 +182,15 @@ export function definePlayground({
       const original = pre?.textContent ?? "";
       const lang = langOf(this);
       const texts = TEXTS[lang];
+      const drawAs = (element: HTMLButtonElement, action: PlaygroundAction) =>
+        drawButton(element, action, texts[action]);
+      const button = (action: PlaygroundAction, onClick: () => void) => {
+        const element = document.createElement("button");
+        element.type = "button";
+        drawAs(element, action);
+        element.addEventListener("click", onClick);
+        return element;
+      };
       wasmBytes ??= wasm();
       const machine = await createMachine(await wasmBytes);
 
@@ -217,9 +239,10 @@ export function definePlayground({
       // The program runs while a frame is requested.
       let frameRequest: number | undefined;
       const stop = () => {
-        if (frameRequest !== undefined) cancelAnimationFrame(frameRequest);
+        if (frameRequest === undefined) return;
+        cancelAnimationFrame(frameRequest);
         frameRequest = undefined;
-        play.textContent = texts.run;
+        drawAs(play, "run");
       };
       const frame = () => {
         if (machine.run(INSTRUCTIONS_PER_FRAME) < INSTRUCTIONS_PER_FRAME)
@@ -228,19 +251,19 @@ export function definePlayground({
         render();
       };
 
-      const step = button(texts.step, () => {
+      const step = button("step", () => {
         stop();
         machine.step();
         render();
       });
-      const play = button(texts.run, () => {
+      const play = button("run", () => {
         if (frameRequest !== undefined) return stop();
         frameRequest = requestAnimationFrame(frame);
-        play.textContent = texts.pause;
+        drawAs(play, "pause");
         // Clicking the button focused it: the keys of a running program go to the screen.
         screen.focus();
       });
-      const reset = button(texts.reset, () => {
+      const reset = button("reset", () => {
         stop();
         machine.load(assembly.blocks);
         render();

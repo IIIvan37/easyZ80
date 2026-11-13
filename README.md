@@ -35,6 +35,19 @@ easyZ80 runs in the browser, through a bundler that handles CSS imports and `new
    </pre></z80-playground>
    ```
 
+## Buttons
+
+By default the toolbar buttons show their label as text. To give them the site's own look, pass `drawButton` to `definePlayground`. easyZ80 calls it when it makes each button, and again each time run and pause swap. `action` is a `PlaygroundAction`: `"step"`, `"run"`, `"pause"` or `"reset"`. `label` is in the page's language; a button without text needs it as its accessible name:
+
+```ts
+definePlayground({
+  drawButton: (button, action, label) => {
+    button.replaceChildren(iconOf(action));
+    button.ariaLabel = label;
+  },
+});
+```
+
 ## Release
 
 From `main`: `pnpm pack`, which builds first, then `gh release create vX.Y.Z` with the tarball. Each release updates the version in the installation step.
